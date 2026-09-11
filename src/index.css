@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — from the `dataviz` skill's validated reference palette
+ * (references/palette.md). Light values declared via @theme (also becomes
+ * Tailwind utilities, e.g. bg-accent/text-ink-secondary); dark values
+ * override the same custom properties at runtime so utilities stay in sync
+ * automatically. Accent = the palette's "orange" categorical slot, used as
+ * the single warm accent for "current session / active" emphasis.
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-page: #f9f9f7;
+  --color-surface: #fcfcfb;
+  --color-ink: #0b0b0b;
+  --color-ink-secondary: #52514e;
+  --color-ink-muted: #898781;
+  --color-grid: #e1e0d9;
+  --color-baseline: #c3c2b7;
+  --color-border: rgba(11, 11, 11, 0.1);
+
+  --color-accent: #eb6834;
+  --color-accent-ink: #ffffff;
+
+  --color-series-blue: #2a78d6;
+  --color-series-orange: #eb6834;
+  --color-series-aqua: #1baf7a;
+  --color-series-yellow: #eda100;
+  --color-series-magenta: #e87ba4;
+  --color-series-green: #008300;
+  --color-series-violet: #4a3aa7;
+  --color-series-red: #e34948;
+
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #0d0d0d;
+    --color-surface: #1a1a19;
+    --color-ink: #ffffff;
+    --color-ink-secondary: #c3c2b7;
+    --color-ink-muted: #898781;
+    --color-grid: #2c2c2a;
+    --color-baseline: #383835;
+    --color-border: rgba(255, 255, 255, 0.1);
+
+    --color-accent: #d95926;
+    --color-accent-ink: #ffffff;
+
+    --color-series-blue: #3987e5;
+    --color-series-orange: #d95926;
+    --color-series-aqua: #199e70;
+    --color-series-yellow: #c98500;
+    --color-series-magenta: #d55181;
+    --color-series-green: #008300;
+    --color-series-violet: #9085e9;
+    --color-series-red: #e66767;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numeric table/axis columns should align vertically. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

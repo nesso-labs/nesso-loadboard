@@ -1,0 +1,38 @@
+import {
+  AlertTriangle,
+  BarChart3,
+  ClipboardList,
+  Dumbbell,
+  Gauge,
+  type LucideIcon,
+  Settings,
+  Swords,
+  Trophy,
+  Upload,
+  UserCircle,
+  Users,
+  CalendarRange,
+} from 'lucide-react'
+
+export interface NavItem {
+  path: string
+  label: string
+  icon: LucideIcon
+  /** True if this page needs multi-session history to be meaningful. */
+  needsHistory?: boolean
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { path: '/', label: 'Overview', icon: Gauge },
+  { path: '/dynamic-load', label: 'Dynamic Load', icon: BarChart3, needsHistory: true },
+  { path: '/session-v-game', label: 'Session v Game', icon: Swords },
+  { path: '/session-v-session', label: 'Session v Session', icon: CalendarRange, needsHistory: true },
+  { path: '/weekly-running', label: 'Weekly Running', icon: ClipboardList, needsHistory: true },
+  { path: '/drills', label: 'Drills', icon: Dumbbell },
+  { path: '/players', label: 'Player Profile', icon: UserCircle },
+  { path: '/alerts', label: 'Alerts & Flags', icon: AlertTriangle, needsHistory: true },
+  { path: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { path: '/roster', label: 'Roster & Positions', icon: Users },
+  { path: '/sessions', label: 'Import / Sessions', icon: Upload },
+  { path: '/settings', label: 'Settings', icon: Settings },
+]
