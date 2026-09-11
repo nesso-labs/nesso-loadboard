@@ -1,6 +1,8 @@
 import { Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { AlertsPage } from './pages/AlertsPage'
+import { ComparePage } from './pages/ComparePage'
+import { DataQualityPage } from './pages/DataQualityPage'
 import { DrillsPage } from './pages/DrillsPage'
 import { DynamicLoadPage } from './pages/DynamicLoadPage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
@@ -23,9 +25,11 @@ export function App() {
         <Route path="/session-v-session" element={<SessionVSessionPage />} />
         <Route path="/weekly-running" element={<WeeklyRunningPage />} />
         <Route path="/drills" element={<DrillsPage />} />
+        <Route path="/compare" element={<ComparePage />} />
         <Route path="/players" element={<PlayerProfilePage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/quality" element={<DataQualityPage />} />
         <Route path="/roster" element={<RosterPage />} />
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

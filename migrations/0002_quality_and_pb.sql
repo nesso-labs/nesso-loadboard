@@ -1,0 +1,2 @@
+ALTER TABLE sessions ADD COLUMN reconciliation TEXT;
+ALTER TABLE players ADD COLUMN pb_confirmed INTEGER NOT NULL DEFAULT 0;

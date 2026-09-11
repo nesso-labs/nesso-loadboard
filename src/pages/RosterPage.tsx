@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users } from 'lucide-react'
+import { Check, Users } from 'lucide-react'
 import { putPlayer } from '../lib/db/repo'
+import { evaluatePlayerPb } from '../lib/metrics/pb'
 import type { Player, Position } from '../types/domain'
 import { EmptyState } from '../components/ui/EmptyState'
 import { queryKeys, usePlayersQuery } from '../state/queries'
@@ -48,6 +49,7 @@ export function RosterPage() {
             <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
               <th className="px-4 py-2">Giocatore</th>
               <th className="px-4 py-2">Posizione</th>
+              <th className="px-4 py-2">Vmax personale</th>
               <th className="px-4 py-2">Attivo</th>
             </tr>
           </thead>
@@ -73,6 +75,34 @@ export function RosterPage() {
                       </option>
                     ))}
                   </select>
+                </td>
+                <td className="px-4 py-2">
+                  {player.personalMaxSpeedKmh === undefined ? (
+                    <span className="text-xs text-ink-muted">—</span>
+                  ) : (
+                    (() => {
+                      const evaluation = evaluatePlayerPb(player, player.personalMaxSpeedKmh)
+                      return (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="tabular-nums text-ink">{player.personalMaxSpeedKmh.toFixed(2)} km/h</span>
+                          {evaluation.status === 'ok' ? (
+                            <span className="rounded-full bg-status-good/15 px-2 py-0.5 font-medium text-status-good">
+                              Confermato
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              title={evaluation.message}
+                              onClick={() => updatePlayer.mutate({ ...player, pbConfirmed: true })}
+                              className="flex items-center gap-1 rounded-full bg-status-warning/20 px-2 py-0.5 font-medium text-ink hover:opacity-80"
+                            >
+                              <Check className="size-3" /> Conferma
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })()
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <input

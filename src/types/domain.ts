@@ -36,6 +36,17 @@ export interface RawCsvRow {
   warnings: string[]
 }
 
+/** One row reassigned from its file-order player to another during import
+ *  reconciliation (a shifted/misattributed name in the source export). */
+export interface ReassignmentAudit {
+  rowIndex: number
+  drillTitle: string
+  fromPlayerName: string
+  toPlayerName: string
+  violatedColumns: string[]
+  reason: string
+}
+
 /** A training/match session — date/label/type are user-supplied at import time. */
 export interface Session {
   id: string
@@ -47,6 +58,8 @@ export interface Session {
   rawRowCount: number
   warningCount: number
   notes?: string
+  /** Rows the reconciliation pass reassigned to a different player — see ReassignmentAudit. */
+  reconciliation?: ReassignmentAudit[]
 }
 
 /** A player, keyed by a slug of their display name (no roster ID exists in the CSV). */
@@ -55,6 +68,8 @@ export interface Player {
   displayName: string
   position: Position
   personalMaxSpeedKmh?: number
+  /** Has a human confirmed personalMaxSpeedKmh is a trustworthy reference? See lib/metrics/pb.ts. */
+  pbConfirmed: boolean
   active: boolean
   createdAt: string
   updatedAt: string

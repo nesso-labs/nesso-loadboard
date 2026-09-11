@@ -13,6 +13,12 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/** Many exports are named "YYYY-MM-DD-..." — infer the session date from the filename when present. */
+function inferDateFromFileName(fileName: string): string | null {
+  const match = fileName.match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
 interface ImportWizardProps {
   onClose: () => void
 }
@@ -39,6 +45,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
     setFileName(file.name)
     setFileText(text)
     setLabel((prev) => prev || file.name.replace(/\.csv$/i, ''))
+    const inferredDate = inferDateFromFileName(file.name)
+    if (inferredDate) setDate(inferredDate)
     setStep('metadata')
   }
 

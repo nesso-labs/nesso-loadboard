@@ -12,12 +12,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!session?.id || !session.date) return badRequest('session id and date are required')
 
   await env.DB.prepare(
-    `INSERT INTO sessions (id, date, label, type, imported_at, source_file_name, raw_row_count, warning_count, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO sessions (id, date, label, type, imported_at, source_file_name, raw_row_count, warning_count, notes, reconciliation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        date = excluded.date, label = excluded.label, type = excluded.type,
        imported_at = excluded.imported_at, source_file_name = excluded.source_file_name,
-       raw_row_count = excluded.raw_row_count, warning_count = excluded.warning_count, notes = excluded.notes`,
+       raw_row_count = excluded.raw_row_count, warning_count = excluded.warning_count, notes = excluded.notes,
+       reconciliation = excluded.reconciliation`,
   )
     .bind(...sessionToRow(session))
     .run()

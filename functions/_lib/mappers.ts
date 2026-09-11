@@ -7,7 +7,18 @@ export interface Env {
 // --- sessions ---
 
 export function sessionToRow(s: Session): unknown[] {
-  return [s.id, s.date, s.label, s.type, s.importedAt, s.sourceFileName ?? null, s.rawRowCount, s.warningCount, s.notes ?? null]
+  return [
+    s.id,
+    s.date,
+    s.label,
+    s.type,
+    s.importedAt,
+    s.sourceFileName ?? null,
+    s.rawRowCount,
+    s.warningCount,
+    s.notes ?? null,
+    s.reconciliation ? JSON.stringify(s.reconciliation) : null,
+  ]
 }
 
 export function rowToSession(r: Record<string, unknown>): Session {
@@ -21,13 +32,14 @@ export function rowToSession(r: Record<string, unknown>): Session {
     rawRowCount: r.raw_row_count as number,
     warningCount: r.warning_count as number,
     notes: (r.notes as string | null) ?? undefined,
+    reconciliation: r.reconciliation ? JSON.parse(r.reconciliation as string) : undefined,
   }
 }
 
 // --- players ---
 
 export function playerToRow(p: Player): unknown[] {
-  return [p.id, p.displayName, p.position, p.personalMaxSpeedKmh ?? null, p.active ? 1 : 0, p.createdAt, p.updatedAt]
+  return [p.id, p.displayName, p.position, p.personalMaxSpeedKmh ?? null, p.pbConfirmed ? 1 : 0, p.active ? 1 : 0, p.createdAt, p.updatedAt]
 }
 
 export function rowToPlayer(r: Record<string, unknown>): Player {
@@ -36,6 +48,7 @@ export function rowToPlayer(r: Record<string, unknown>): Player {
     displayName: r.display_name as string,
     position: r.position as Player['position'],
     personalMaxSpeedKmh: (r.personal_max_speed_kmh as number | null) ?? undefined,
+    pbConfirmed: Boolean(r.pb_confirmed),
     active: Boolean(r.active),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,

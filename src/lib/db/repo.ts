@@ -31,7 +31,12 @@ export async function listPlayers(): Promise<Player[]> {
 export async function putPlayer(player: Player): Promise<void> {
   await apiFetch(`/api/players/${player.id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ position: player.position, active: player.active, personalMaxSpeedKmh: player.personalMaxSpeedKmh }),
+    body: JSON.stringify({
+      position: player.position,
+      active: player.active,
+      personalMaxSpeedKmh: player.personalMaxSpeedKmh,
+      pbConfirmed: player.pbConfirmed,
+    }),
   })
 }
 

@@ -1,6 +1,8 @@
-import type { RpeEntry, Session, SessionType } from '../../types/domain'
-import { putRpeEntries, putSegments, putSession } from '../db/repo'
+import type { Player, ReassignmentAudit, RpeEntry, Session, SessionType } from '../../types/domain'
+import { listPlayers, putPlayer, putRpeEntries, putSegments, putSession } from '../db/repo'
+import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
+import { reconcileRows } from './reconcile'
 import { buildSegmentsForSession } from './segmentBuilder'
 
 export interface SessionMetadataInput {
@@ -16,25 +18,30 @@ export interface StagedImport {
   segments: Awaited<ReturnType<typeof buildSegmentsForSession>>['segments']
   warnings: string[]
   rawRowCount: number
+  reconciliation: ReassignmentAudit[]
 }
 
-/** Parse + build segments in-memory, without touching IndexedDB yet. */
+/** Parse + reconcile + build segments in-memory, without touching the API yet. */
 export async function stageImport(fileText: string, fileName: string, metadata: SessionMetadataInput): Promise<StagedImport> {
   const sessionId = crypto.randomUUID()
   const parsed = parseSessionCsv(fileText)
-  const { segments, warnings } = await buildSegmentsForSession(sessionId, parsed.rows)
+  const { rows, audits } = reconcileRows(parsed.rows)
+  const { segments, warnings } = await buildSegmentsForSession(sessionId, rows)
+
+  const reconciliationWarnings = audits.map((a) => a.reason)
 
   return {
     sessionId,
     metadata,
     sourceFileName: fileName,
     segments,
-    warnings: [...parsed.globalWarnings, ...warnings],
+    warnings: [...parsed.globalWarnings, ...reconciliationWarnings, ...warnings],
     rawRowCount: parsed.rowCount,
+    reconciliation: audits,
   }
 }
 
-/** Persist a staged import (and any RPE entered for it) to IndexedDB. */
+/** Persist a staged import (and any RPE entered for it), then reconcile PB references. */
 export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<string, number>): Promise<Session> {
   const now = new Date().toISOString()
   const session: Session = {
@@ -46,6 +53,7 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
     sourceFileName: staged.sourceFileName,
     rawRowCount: staged.rawRowCount,
     warningCount: staged.warnings.length,
+    reconciliation: staged.reconciliation.length > 0 ? staged.reconciliation : undefined,
   }
 
   await putSession(session)
@@ -78,5 +86,31 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
     await putRpeEntries(rpeEntries)
   }
 
+  await updatePersonalBests(staged.segments)
+
   return session
+}
+
+/** Auto-updates a player's recorded max speed when this session beats it — flips pbConfirmed to false so it surfaces on the Data Quality page until a human checks it. */
+async function updatePersonalBests(segments: StagedImport['segments']): Promise<void> {
+  const maxSpeedByPlayer = new Map<string, number>()
+  for (const seg of segments) {
+    maxSpeedByPlayer.set(seg.playerId, Math.max(maxSpeedByPlayer.get(seg.playerId) ?? 0, seg.maxSpeedKmh))
+  }
+  if (maxSpeedByPlayer.size === 0) return
+
+  const players = await listPlayers()
+  const playerById = new Map(players.map((p) => [p.id, p]))
+
+  await Promise.all(
+    [...maxSpeedByPlayer.entries()].map(async ([playerId, sessionMax]) => {
+      const player = playerById.get(playerId)
+      if (!player) return
+      const evaluation = evaluatePlayerPb(player, sessionMax)
+      if (evaluation.status === 'new_record') {
+        const updated: Player = { ...player, personalMaxSpeedKmh: sessionMax, pbConfirmed: false }
+        await putPlayer(updated)
+      }
+    }),
+  )
 }

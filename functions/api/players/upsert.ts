@@ -32,13 +32,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     id,
     displayName,
     position: 'UNSPECIFIED',
+    pbConfirmed: false,
     active: true,
     createdAt: now,
     updatedAt: now,
   }
   await env.DB.prepare(
-    `INSERT INTO players (id, display_name, position, personal_max_speed_kmh, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO players (id, display_name, position, personal_max_speed_kmh, pb_confirmed, active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(...playerToRow(created))
     .run()

@@ -1,3 +1,11 @@
+/** Midrank percentile: 0-100, where ties split the difference. */
+export function percentileRank(value: number, allValues: number[]): number {
+  if (allValues.length === 0) return 0
+  const below = allValues.filter((v) => v < value).length
+  const equal = allValues.filter((v) => v === value).length
+  return ((below + 0.5 * equal) / allValues.length) * 100
+}
+
 export function median(values: number[]): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
