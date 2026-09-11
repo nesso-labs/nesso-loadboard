@@ -1,4 +1,4 @@
-import type { DrillSegment, RawCsvRow, SegmentKind } from '../../types/domain'
+import type { DrillSegment, RawCsvRow, SegmentKind, SessionType } from '../../types/domain'
 import { upsertPlayerByName } from '../db/repo'
 import { slugify } from '../utils'
 
@@ -7,6 +7,12 @@ export function classifySegmentKind(drillTitle: string): SegmentKind {
   if (lower.includes('full session')) return 'full_session'
   if (lower.includes('warm')) return 'warmup'
   return 'drill'
+}
+
+/** Match-day exports never carry a "Full Session" row — the two half rows ARE the whole match. */
+function isMatchHalfSegment(drillTitle: string): boolean {
+  const normalized = drillTitle.toLowerCase().replace(/\s+/g, '')
+  return normalized === '1sthalf' || normalized === '2ndhalf'
 }
 
 export interface BuildResult {
@@ -20,7 +26,11 @@ export interface BuildResult {
  * Player record for every distinct name seen. Never blocks the whole import
  * over one messy player/row — this is an MVP demo, not a production ETL.
  */
-export async function buildSegmentsForSession(sessionId: string, rows: RawCsvRow[]): Promise<BuildResult> {
+export async function buildSegmentsForSession(
+  sessionId: string,
+  rows: RawCsvRow[],
+  sessionType: SessionType,
+): Promise<BuildResult> {
   const warnings: string[] = []
   const byPlayerAndDrill = new Map<string, RawCsvRow[]>()
 
@@ -98,20 +108,29 @@ export async function buildSegmentsForSession(sessionId: string, rows: RawCsvRow
     byPlayer.set(s.playerId, list)
   }
 
-  // Some exports (typically match days: "1stHalf"/"2ndHalf") never carry an
-  // explicit "Full Session" row. Synthesize one by summing every other
-  // segment for that player — safe here because these rows are genuinely
-  // non-overlapping session parts, not a drill nested inside an existing
-  // Full Session total (which would double-count).
+  // Some exports never carry an explicit "Full Session" row. Match-day exports in
+  // particular NEVER have one — only "1st Half"/"2nd Half" rows — and the full match
+  // total must be synthesized from exactly those two, never from any other row that
+  // might be present (e.g. a pre-match warm-up), or the total would be inflated with
+  // time that isn't actually part of the match. For training sessions missing a Full
+  // Session row, every other segment for that player genuinely is the whole session
+  // (non-overlapping parts, not a drill nested inside an existing total), so summing
+  // all of them is safe there.
   for (const [playerId, playerSegments] of byPlayer) {
     if (playerSegments.some((s) => s.segmentKind === 'full_session')) continue
-    const sum = (getValue: (s: DrillSegment) => number) => playerSegments.reduce((total, s) => total + getValue(s), 0)
-    const maxOf = (getValue: (s: DrillSegment) => number) => Math.max(0, ...playerSegments.map(getValue))
+
+    const componentSegments =
+      sessionType === 'match' ? playerSegments.filter((s) => isMatchHalfSegment(s.drillTitle)) : playerSegments
+    if (componentSegments.length === 0) continue
+
+    const sum = (getValue: (s: DrillSegment) => number) =>
+      componentSegments.reduce((total, s) => total + getValue(s), 0)
+    const maxOf = (getValue: (s: DrillSegment) => number) => Math.max(0, ...componentSegments.map(getValue))
     const synthesized: DrillSegment = {
       id: `${sessionId}:${playerId}:full-session-synth`,
       sessionId,
       playerId,
-      drillTitle: 'Full Session (stimata)',
+      drillTitle: sessionType === 'match' ? 'Full Match (stimata)' : 'Full Session (stimata)',
       segmentKind: 'full_session',
       durationSec: sum((s) => s.durationSec),
       totalDistanceM: sum((s) => s.totalDistanceM),
@@ -145,11 +164,15 @@ export async function buildSegmentsForSession(sessionId: string, rows: RawCsvRow
       synthesized.decPerMin = sum((s) => s.decZone3 + s.decZone4 + s.decZone5 + s.decZone6) / durationMin
     }
     segments.push(synthesized)
-    const originalCount = playerSegments.length
     playerSegments.push(synthesized)
-    warnings.push(
-      `${displayNameByPlayerId.get(playerId) ?? playerId} — nessuna riga "Full Session" trovata: sessione totale calcolata sommando ${originalCount} drill (es. 1st/2nd Half).`,
-    )
+    // Match-day exports never carry a "Full Session" row by design (only the two
+    // halves) — that's the normal shape of this export, not a data-quality issue,
+    // so it's not surfaced as an import warning.
+    if (sessionType !== 'match') {
+      warnings.push(
+        `${displayNameByPlayerId.get(playerId) ?? playerId} — nessuna riga "Full Session" trovata: sessione totale calcolata sommando ${componentSegments.length} drill (es. 1st/2nd Half).`,
+      )
+    }
   }
 
   // Informational-only: a warmup segment suspiciously close in duration to a

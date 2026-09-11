@@ -27,7 +27,7 @@ export async function stageImport(fileText: string, fileName: string, metadata: 
   const sessionId = crypto.randomUUID()
   const parsed = parseSessionCsv(fileText)
   const { rows, audits } = reconcileRows(parsed.rows)
-  const { segments, warnings } = await buildSegmentsForSession(sessionId, rows)
+  const { segments, warnings } = await buildSegmentsForSession(sessionId, rows, metadata.type)
 
   const reconciliationWarnings = audits.map((a) => a.reason)
 

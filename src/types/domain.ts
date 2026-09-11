@@ -121,8 +121,8 @@ export interface DrillSegment {
   droppedDuplicates?: { drillTitle: string; durationSec: number }[]
   warnings?: string[]
   /** True if no "Full Session"-labeled row existed for this player and this
-   *  segment was synthesized by summing all of their other segments instead
-   *  (e.g. match-day exports with only "1stHalf"/"2ndHalf" rows). */
+   *  segment was synthesized instead — for a match, strictly the sum of the
+   *  1st/2nd Half rows; for a training, the sum of all other segments. */
   isSynthesizedFullSession?: boolean
 }
 

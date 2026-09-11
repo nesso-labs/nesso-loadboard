@@ -38,7 +38,10 @@ export function DataQualityPage() {
   if (!currentSession || loadingSegments) return null
 
   const reassignments = currentSession.reconciliation ?? []
-  const synthesized = segments.filter((s) => s.isSynthesizedFullSession)
+  // Match-day exports never carry a "Full Session" row by design (only 1st/2nd
+  // Half) — that's the normal shape of this export, not a data-quality issue, so
+  // it's not flagged here. Only a training session missing one is unusual.
+  const synthesized = segments.filter((s) => s.isSynthesizedFullSession && currentSession.type !== 'match')
   const playersInSession = new Set(segments.map((s) => s.playerId))
 
   const pbFlags = players
