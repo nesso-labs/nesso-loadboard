@@ -48,6 +48,16 @@ export function SessionVGamePage() {
     )
   }
 
+  if (currentSession.type === 'match') {
+    return (
+      <EmptyState
+        icon={Swords}
+        title="Questa è già una partita"
+        description="Questa vista confronta un allenamento con un drill 'di gara' al suo interno — non si applica a una sessione già di tipo Partita. Seleziona una sessione di allenamento dal menu in alto."
+      />
+    )
+  }
+
   if (gameSegs.length === 0) {
     return (
       <EmptyState

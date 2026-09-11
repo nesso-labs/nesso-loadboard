@@ -1,0 +1,135 @@
+import { CalendarRange } from 'lucide-react'
+import { Fragment, useMemo } from 'react'
+import { EmptyState } from '../components/ui/EmptyState'
+import { median } from '../lib/metrics/heatmap'
+import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
+import { useCurrentSession } from '../state/CurrentSessionContext'
+import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import type { DrillSegment, Position } from '../types/domain'
+
+const MIN_COMPARABLE_SESSIONS = 3
+const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
+
+interface MetricSpec {
+  key: string
+  label: string
+  getValue: (s: DrillSegment) => number
+}
+
+export function SessionVSessionPage() {
+  const { currentSession } = useCurrentSession()
+  const { data: sessions = [] } = useSessionsQuery()
+  const { data: segments = [], isLoading } = useAllSegmentsQuery()
+  const { data: players = [] } = usePlayersQuery()
+  const { data: settings } = useSettingsQuery()
+
+  const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+
+  if (!currentSession || isLoading || !settings) return null
+
+  const metrics: MetricSpec[] = [
+    { key: 'td', label: 'Distanza tot. (m)', getValue: (s) => s.totalDistanceM },
+    { key: 'hsr', label: 'D>19.8 (m)', getValue: distanceAbove19_8 },
+    { key: 'sprint', label: 'D>25.2 (m)', getValue: distanceAbove25_2 },
+    { key: 'mechw', label: 'MechW (#)', getValue: (s) => mechanicalWork(s, settings) },
+  ]
+
+  const sameTypeSessionIds = new Set(
+    sessions.filter((s) => s.type === currentSession.type && s.id !== currentSession.id).map((s) => s.id),
+  )
+  const currentSegs = segments.filter((s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session')
+
+  if (currentSegs.length === 0) {
+    return (
+      <EmptyState
+        icon={CalendarRange}
+        title="Nessun dato per questa sessione"
+        description="Serve almeno una riga 'Full Session' in questa sessione."
+      />
+    )
+  }
+
+  const historyByPlayer = new Map<string, DrillSegment[]>()
+  for (const seg of segments) {
+    if (seg.segmentKind === 'full_session' && sameTypeSessionIds.has(seg.sessionId)) {
+      const list = historyByPlayer.get(seg.playerId) ?? []
+      list.push(seg)
+      historyByPlayer.set(seg.playerId, list)
+    }
+  }
+
+  const rows = currentSegs.map((seg) => ({
+    seg,
+    position: playerById.get(seg.playerId)?.position ?? 'UNSPECIFIED',
+    name: playerById.get(seg.playerId)?.displayName ?? seg.playerId,
+    history: historyByPlayer.get(seg.playerId) ?? [],
+  }))
+
+  const byPosition = new Map<Position, typeof rows>()
+  for (const row of rows) {
+    const list = byPosition.get(row.position) ?? []
+    list.push(row)
+    byPosition.set(row.position, list)
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-ink-secondary">
+        Confronto tra questa sessione e lo storico dello stesso giocatore, su sessioni dello stesso tipo (
+        {currentSession.type === 'match' ? 'partita' : 'allenamento'}). Servono almeno {MIN_COMPARABLE_SESSIONS}{' '}
+        sessioni storiche per giocatore per un confronto affidabile.
+      </p>
+
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full whitespace-nowrap text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+              <th className="px-4 py-2">Giocatore</th>
+              {metrics.map((m) => (
+                <th key={m.key} className="px-3 py-2 text-right">
+                  {m.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {POSITION_ORDER.filter((pos) => byPosition.has(pos)).map((pos) => (
+              <Fragment key={pos}>
+                <tr key={`${pos}-header`}>
+                  <td colSpan={metrics.length + 1} className="bg-page/40 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    {pos}
+                  </td>
+                </tr>
+                {byPosition
+                  .get(pos)!
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((row) => (
+                    <tr key={row.seg.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 font-medium text-ink">{row.name}</td>
+                      {metrics.map((m) => {
+                        const current = m.getValue(row.seg)
+                        const enoughHistory = row.history.length >= MIN_COMPARABLE_SESSIONS
+                        const historyMedian = enoughHistory ? median(row.history.map(m.getValue)) : null
+                        return (
+                          <td key={m.key} className="px-3 py-2 text-right tabular-nums text-ink">
+                            {current.toFixed(0)}
+                            {historyMedian !== null ? (
+                              <span className="ml-1 text-xs text-ink-muted">
+                                vs {historyMedian.toFixed(0)} (n={row.history.length})
+                              </span>
+                            ) : (
+                              <span className="ml-1 text-xs text-ink-muted">(n={row.history.length}, insuff.)</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

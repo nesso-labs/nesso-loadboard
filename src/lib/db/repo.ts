@@ -95,6 +95,11 @@ export async function listRpeBySession(sessionId: string): Promise<RpeEntry[]> {
   return db.getAllFromIndex('rpe', 'by-sessionId', sessionId)
 }
 
+export async function listAllRpe(): Promise<RpeEntry[]> {
+  const db = await getDb()
+  return db.getAll('rpe')
+}
+
 export async function putRpeEntry(entry: RpeEntry): Promise<void> {
   const db = await getDb()
   await db.put('rpe', entry)

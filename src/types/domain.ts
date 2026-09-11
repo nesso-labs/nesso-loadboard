@@ -91,6 +91,10 @@ export interface DrillSegment {
   decPerMin: number
   droppedDuplicates?: { drillTitle: string; durationSec: number }[]
   warnings?: string[]
+  /** True if no "Full Session"-labeled row existed for this player and this
+   *  segment was synthesized by summing all of their other segments instead
+   *  (e.g. match-day exports with only "1stHalf"/"2ndHalf" rows). */
+  isSynthesizedFullSession?: boolean
 }
 
 /** Manual RPE entry for one player in one session (Borg CR10 by default). */

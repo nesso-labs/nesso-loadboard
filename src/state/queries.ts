@@ -1,12 +1,23 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { listAllSegments, listPlayers, listRpeBySession, listSegmentsBySession, listSessions, getSettings } from '../lib/db/repo'
+import {
+  listAllRpe,
+  listAllSegments,
+  listPlayers,
+  listRpeBySession,
+  listSegmentsByPlayer,
+  listSegmentsBySession,
+  listSessions,
+  getSettings,
+} from '../lib/db/repo'
 
 export const queryKeys = {
   sessions: ['sessions'] as const,
   players: ['players'] as const,
   segmentsBySession: (sessionId: string) => ['segments', 'by-session', sessionId] as const,
+  segmentsByPlayer: (playerId: string) => ['segments', 'by-player', playerId] as const,
   allSegments: ['segments', 'all'] as const,
   rpeBySession: (sessionId: string) => ['rpe', 'by-session', sessionId] as const,
+  allRpe: ['rpe', 'all'] as const,
   settings: ['settings'] as const,
 }
 
@@ -26,6 +37,14 @@ export function useSegmentsBySessionQuery(sessionId: string | undefined) {
   })
 }
 
+export function useSegmentsByPlayerQuery(playerId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.segmentsByPlayer(playerId ?? ''),
+    queryFn: () => listSegmentsByPlayer(playerId as string),
+    enabled: !!playerId,
+  })
+}
+
 export function useAllSegmentsQuery() {
   return useQuery({ queryKey: queryKeys.allSegments, queryFn: listAllSegments })
 }
@@ -36,6 +55,10 @@ export function useRpeBySessionQuery(sessionId: string | undefined) {
     queryFn: () => listRpeBySession(sessionId as string),
     enabled: !!sessionId,
   })
+}
+
+export function useAllRpeQuery() {
+  return useQuery({ queryKey: queryKeys.allRpe, queryFn: listAllRpe })
 }
 
 export function useSettingsQuery() {

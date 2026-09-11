@@ -34,6 +34,7 @@ export async function buildSegmentsForSession(sessionId: string, rows: RawCsvRow
   const playerNames = [...new Set(rows.map((r) => r.playerDisplayName))]
   const players = await Promise.all(playerNames.map((name) => upsertPlayerByName(name)))
   const playerIdByName = new Map(players.map((p) => [p.displayName, p.id]))
+  const displayNameByPlayerId = new Map(players.map((p) => [p.id, p.displayName]))
 
   const segments: DrillSegment[] = []
 
@@ -90,15 +91,70 @@ export async function buildSegmentsForSession(sessionId: string, rows: RawCsvRow
     segments.push(segment)
   }
 
-  // Informational-only: a warmup segment suspiciously close in duration to a
-  // full_session row for the same player hints at an export artifact — never
-  // auto-resolved, just surfaced.
   const byPlayer = new Map<string, DrillSegment[]>()
   for (const s of segments) {
     const list = byPlayer.get(s.playerId) ?? []
     list.push(s)
     byPlayer.set(s.playerId, list)
   }
+
+  // Some exports (typically match days: "1stHalf"/"2ndHalf") never carry an
+  // explicit "Full Session" row. Synthesize one by summing every other
+  // segment for that player — safe here because these rows are genuinely
+  // non-overlapping session parts, not a drill nested inside an existing
+  // Full Session total (which would double-count).
+  for (const [playerId, playerSegments] of byPlayer) {
+    if (playerSegments.some((s) => s.segmentKind === 'full_session')) continue
+    const sum = (getValue: (s: DrillSegment) => number) => playerSegments.reduce((total, s) => total + getValue(s), 0)
+    const maxOf = (getValue: (s: DrillSegment) => number) => Math.max(0, ...playerSegments.map(getValue))
+    const synthesized: DrillSegment = {
+      id: `${sessionId}:${playerId}:full-session-synth`,
+      sessionId,
+      playerId,
+      drillTitle: 'Full Session (stimata)',
+      segmentKind: 'full_session',
+      durationSec: sum((s) => s.durationSec),
+      totalDistanceM: sum((s) => s.totalDistanceM),
+      distancePerMin: 0, // recomputed below once duration is known
+      distanceZone4M: sum((s) => s.distanceZone4M),
+      distanceZone5M: sum((s) => s.distanceZone5M),
+      distanceZone6M: sum((s) => s.distanceZone6M),
+      entriesZone5: sum((s) => s.entriesZone5),
+      entriesZone6: sum((s) => s.entriesZone6),
+      hsrM: sum((s) => s.hsrM),
+      hsrPerMin: 0,
+      maxSpeedKmh: maxOf((s) => s.maxSpeedKmh),
+      pctMaxSpeed: maxOf((s) => s.pctMaxSpeed),
+      accZone3: sum((s) => s.accZone3),
+      decZone3: sum((s) => s.decZone3),
+      accZone4: sum((s) => s.accZone4),
+      decZone4: sum((s) => s.decZone4),
+      accZone5: sum((s) => s.accZone5),
+      decZone5: sum((s) => s.decZone5),
+      accZone6: sum((s) => s.accZone6),
+      decZone6: sum((s) => s.decZone6),
+      accPerMin: 0,
+      decPerMin: 0,
+      isSynthesizedFullSession: true,
+    }
+    const durationMin = synthesized.durationSec / 60
+    if (durationMin > 0) {
+      synthesized.distancePerMin = synthesized.totalDistanceM / durationMin
+      synthesized.hsrPerMin = synthesized.hsrM / durationMin
+      synthesized.accPerMin = sum((s) => s.accZone3 + s.accZone4 + s.accZone5 + s.accZone6) / durationMin
+      synthesized.decPerMin = sum((s) => s.decZone3 + s.decZone4 + s.decZone5 + s.decZone6) / durationMin
+    }
+    segments.push(synthesized)
+    const originalCount = playerSegments.length
+    playerSegments.push(synthesized)
+    warnings.push(
+      `${displayNameByPlayerId.get(playerId) ?? playerId} — nessuna riga "Full Session" trovata: sessione totale calcolata sommando ${originalCount} drill (es. 1st/2nd Half).`,
+    )
+  }
+
+  // Informational-only: a warmup segment suspiciously close in duration to a
+  // full_session row for the same player hints at an export artifact — never
+  // auto-resolved, just surfaced.
   for (const [, playerSegments] of byPlayer) {
     const fullSessions = playerSegments.filter((s) => s.segmentKind === 'full_session')
     const warmups = playerSegments.filter((s) => s.segmentKind === 'warmup')

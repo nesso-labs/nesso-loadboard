@@ -1,61 +1,29 @@
-import { BarChart3, CalendarRange, ClipboardList, Settings, Trophy, UserCircle } from 'lucide-react'
+import { Settings, Trophy } from 'lucide-react'
 import { Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { AlertsPage } from './pages/AlertsPage'
 import { ComingSoonPage } from './pages/ComingSoonPage'
 import { DrillsPage } from './pages/DrillsPage'
+import { DynamicLoadPage } from './pages/DynamicLoadPage'
 import { OverviewPage } from './pages/OverviewPage'
+import { PlayerProfilePage } from './pages/PlayerProfilePage'
 import { RosterPage } from './pages/RosterPage'
 import { SessionsPage } from './pages/SessionsPage'
 import { SessionVGamePage } from './pages/SessionVGamePage'
+import { SessionVSessionPage } from './pages/SessionVSessionPage'
+import { WeeklyRunningPage } from './pages/WeeklyRunningPage'
 
 export function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<OverviewPage />} />
-        <Route
-          path="/dynamic-load"
-          element={
-            <ComingSoonPage
-              icon={BarChart3}
-              title="Dynamic Load"
-              description="Trend multi-sessione (7d rolling average) su distanza, HSR, sprint, mechanical work e sRPE. Richiede più sessioni in archivio — in arrivo."
-            />
-          }
-        />
+        <Route path="/dynamic-load" element={<DynamicLoadPage />} />
         <Route path="/session-v-game" element={<SessionVGamePage />} />
-        <Route
-          path="/session-v-session"
-          element={
-            <ComingSoonPage
-              icon={CalendarRange}
-              title="Session v Session"
-              description="Questa sessione confrontata con lo storico per gruppo di posizione — richiede più sessioni comparabili, in arrivo."
-            />
-          }
-        />
-        <Route
-          path="/weekly-running"
-          element={
-            <ComingSoonPage
-              icon={ClipboardList}
-              title="Weekly Running"
-              description="Percentuale per giocatore su un riferimento settimanale, con media squadra — in arrivo."
-            />
-          }
-        />
+        <Route path="/session-v-session" element={<SessionVSessionPage />} />
+        <Route path="/weekly-running" element={<WeeklyRunningPage />} />
         <Route path="/drills" element={<DrillsPage />} />
-        <Route
-          path="/players"
-          element={
-            <ComingSoonPage
-              icon={UserCircle}
-              title="Player Profile"
-              description="Storico individuale nel tempo per ogni giocatore — in arrivo."
-            />
-          }
-        />
+        <Route path="/players" element={<PlayerProfilePage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route
           path="/leaderboard"
