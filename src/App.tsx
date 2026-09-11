@@ -4,7 +4,6 @@ import {
   CalendarRange,
   ClipboardList,
   Settings,
-  Swords,
   Trophy,
   UserCircle,
 } from 'lucide-react'
@@ -15,6 +14,7 @@ import { DrillsPage } from './pages/DrillsPage'
 import { OverviewPage } from './pages/OverviewPage'
 import { RosterPage } from './pages/RosterPage'
 import { SessionsPage } from './pages/SessionsPage'
+import { SessionVGamePage } from './pages/SessionVGamePage'
 
 export function App() {
   return (
@@ -31,16 +31,7 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/session-v-game"
-          element={
-            <ComingSoonPage
-              icon={Swords}
-              title="Session v Game"
-              description="Confronto tra la sessione e il drill di riferimento (partita/scrimmage) su volume e intensità — in arrivo."
-            />
-          }
-        />
+        <Route path="/session-v-game" element={<SessionVGamePage />} />
         <Route
           path="/session-v-session"
           element={

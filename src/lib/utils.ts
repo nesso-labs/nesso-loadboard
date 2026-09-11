@@ -36,6 +36,11 @@ export function formatPercent(value: number, fractionDigits = 0): string {
   return `${formatNumber(value, fractionDigits)}%`
 }
 
+export function mean(values: number[]): number {
+  if (values.length === 0) return 0
+  return values.reduce((sum, v) => sum + v, 0) / values.length
+}
+
 export function isoWeek(dateIso: string): string {
   const d = new Date(dateIso + 'T00:00:00Z')
   const target = new Date(d.valueOf())
