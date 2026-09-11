@@ -8,13 +8,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:pages": "pnpm build && wrangler pages dev dist",
+    "db:migrate:local": "wrangler d1 execute nesso-loadboard --local --file=./migrations/0001_init.sql",
+    "db:migrate:remote": "wrangler d1 execute nesso-loadboard --remote --file=./migrations/0001_init.sql"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "idb": "^8.0.3",
     "lucide-react": "^1.44.0",
     "papaparse": "^5.7.0",
     "react": "^19.2.8",
@@ -23,6 +25,7 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260910.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.3",
     "@types/papaparse": "^5.5.2",
@@ -32,6 +35,7 @@
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "wrangler": "^4.130.0"
   }
 }

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nesso-loadboard",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-06-15",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nesso-loadboard",
+      "database_id": "20555707-dbb3-453c-9a34-b0a1b5a13856"
+    }
+  ]
+}
