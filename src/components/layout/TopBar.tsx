@@ -26,20 +26,20 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         <Menu className="size-5" />
       </button>
 
-      <h1 className="text-sm font-semibold text-ink">{pageLabel}</h1>
+      <h1 className="truncate text-sm font-semibold text-ink">{pageLabel}</h1>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
         {sessions.length > 0 && (
-          <div className="relative">
+          <div className="relative min-w-0">
             <button
               type="button"
               onClick={() => setPickerOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+              className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 sm:gap-1.5 sm:px-3"
             >
-              <span className="max-w-40 truncate">
+              <span className="max-w-20 truncate sm:max-w-40">
                 {currentSession ? `${currentSession.date} · ${currentSession.label}` : 'Seleziona sessione'}
               </span>
-              <ChevronDown className="size-3.5" />
+              <ChevronDown className="size-3.5 shrink-0" />
             </button>
             {pickerOpen && (
               <div className="absolute right-0 z-40 mt-1 w-64 rounded-md border border-border bg-surface py-1 shadow-lg">
@@ -67,7 +67,8 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         <button
           type="button"
           onClick={() => window.print()}
-          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+          aria-label="Stampa / esporta PDF"
+          className="hidden items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 md:flex"
         >
           <Printer className="size-3.5" />
           Stampa / PDF
@@ -75,10 +76,11 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
 
         <Link
           to="/sessions"
-          className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90"
+          aria-label="Importa sessione"
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-2 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 sm:px-3"
         >
           <Upload className="size-3.5" />
-          Importa sessione
+          <span className="hidden sm:inline">Importa sessione</span>
         </Link>
       </div>
     </header>
