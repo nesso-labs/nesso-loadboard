@@ -3,17 +3,18 @@ import {
   BarChart3,
   CalendarRange,
   ClipboardList,
-  Dumbbell,
   Settings,
   Swords,
   Trophy,
   UserCircle,
-  Users,
 } from 'lucide-react'
 import { Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { ComingSoonPage } from './pages/ComingSoonPage'
+import { DrillsPage } from './pages/DrillsPage'
 import { OverviewPage } from './pages/OverviewPage'
+import { RosterPage } from './pages/RosterPage'
+import { SessionsPage } from './pages/SessionsPage'
 
 export function App() {
   return (
@@ -60,16 +61,7 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/drills"
-          element={
-            <ComingSoonPage
-              icon={Dumbbell}
-              title="Drills"
-              description="Tabella per tipo di drill con mediana squadra e heatmap sugli outlier — in arrivo a breve."
-            />
-          }
-        />
+        <Route path="/drills" element={<DrillsPage />} />
         <Route
           path="/players"
           element={
@@ -100,26 +92,8 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/roster"
-          element={
-            <ComingSoonPage
-              icon={Users}
-              title="Roster & Positions"
-              description="Gestione giocatori e posizioni — in arrivo a breve."
-            />
-          }
-        />
-        <Route
-          path="/sessions"
-          element={
-            <ComingSoonPage
-              icon={Users}
-              title="Import / Sessions"
-              description="Il wizard di import CSV arriva nel prossimo aggiornamento."
-            />
-          }
-        />
+        <Route path="/roster" element={<RosterPage />} />
+        <Route path="/sessions" element={<SessionsPage />} />
         <Route
           path="/settings"
           element={

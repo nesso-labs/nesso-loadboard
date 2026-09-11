@@ -36,6 +36,14 @@
   --color-status-warning: #fab219;
   --color-status-serious: #ec835a;
   --color-status-critical: #d03b3b;
+
+  /* Diverging heatmap fills (Drills table) — blue/red poles from the
+     categorical palette, low-alpha so cell text (ink) stays legible; the
+     number itself always carries the value, the tint is a secondary cue. */
+  --heat-low-strong: rgba(42, 120, 214, 0.24);
+  --heat-low-mild: rgba(42, 120, 214, 0.1);
+  --heat-high-mild: rgba(227, 73, 72, 0.1);
+  --heat-high-strong: rgba(227, 73, 72, 0.24);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,6 +68,11 @@
     --color-series-green: #008300;
     --color-series-violet: #9085e9;
     --color-series-red: #e66767;
+
+    --heat-low-strong: rgba(57, 135, 229, 0.32);
+    --heat-low-mild: rgba(57, 135, 229, 0.14);
+    --heat-high-mild: rgba(230, 103, 103, 0.14);
+    --heat-high-strong: rgba(230, 103, 103, 0.32);
   }
 }
 

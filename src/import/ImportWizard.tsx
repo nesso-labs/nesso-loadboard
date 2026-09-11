@@ -1,0 +1,287 @@
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, Upload } from 'lucide-react'
+import { useState } from 'react'
+import { CsvImportError } from '../lib/csv/parseSessionCsv'
+import { commitImport, stageImport, type StagedImport } from '../lib/csv/importSession'
+import { listPlayers } from '../lib/db/repo'
+import type { Player, SessionType } from '../types/domain'
+import { useCurrentSession } from '../state/CurrentSessionContext'
+import { useInvalidateAfterImport } from '../state/queries'
+
+type Step = 'select' | 'metadata' | 'rpe' | 'done'
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+interface ImportWizardProps {
+  onClose: () => void
+}
+
+export function ImportWizard({ onClose }: ImportWizardProps) {
+  const [step, setStep] = useState<Step>('select')
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string>('')
+  const [fileText, setFileText] = useState<string>('')
+  const [date, setDate] = useState(todayIso())
+  const [label, setLabel] = useState('')
+  const [type, setType] = useState<SessionType>('training')
+  const [staged, setStaged] = useState<StagedImport | null>(null)
+  const [players, setPlayers] = useState<Player[]>([])
+  const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
+  const [saving, setSaving] = useState(false)
+
+  const invalidate = useInvalidateAfterImport()
+  const { setCurrentSessionId } = useCurrentSession()
+
+  async function handleFile(file: File) {
+    setFileError(null)
+    const text = await file.text()
+    setFileName(file.name)
+    setFileText(text)
+    setLabel((prev) => prev || file.name.replace(/\.csv$/i, ''))
+    setStep('metadata')
+  }
+
+  async function handleMetadataSubmit() {
+    try {
+      const result = await stageImport(fileText, fileName, { date, label: label || fileName, type })
+      setStaged(result)
+      const allPlayers = await listPlayers()
+      const involvedIds = new Set(result.segments.map((s) => s.playerId))
+      setPlayers(allPlayers.filter((p) => involvedIds.has(p.id)))
+      setStep('rpe')
+    } catch (err) {
+      if (err instanceof CsvImportError) {
+        setFileError(err.message)
+        setStep('select')
+      } else {
+        throw err
+      }
+    }
+  }
+
+  async function handleFinish() {
+    if (!staged) return
+    setSaving(true)
+    const session = await commitImport(staged, rpeByPlayerId)
+    invalidate()
+    setCurrentSessionId(session.id)
+    setSaving(false)
+    setStep('done')
+  }
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <StepHeader step={step} />
+
+      {step === 'select' && (
+        <FileDropZone onFile={handleFile} error={fileError} />
+      )}
+
+      {step === 'metadata' && (
+        <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
+          <p className="text-sm text-ink-secondary">
+            File: <span className="font-medium text-ink">{fileName}</span> — il CSV non contiene data/etichetta, indicale qui.
+          </p>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-ink">Data sessione</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-ink">Etichetta</span>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="es. Allenamento martedì, Amichevole vs..."
+              className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-ink">Tipo</span>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as SessionType)}
+              className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+            >
+              <option value="training">Allenamento</option>
+              <option value="match">Partita</option>
+            </select>
+          </label>
+          <div className="flex justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setStep('select')}
+              className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-ink-secondary hover:bg-ink/5"
+            >
+              <ArrowLeft className="size-4" /> Indietro
+            </button>
+            <button
+              type="button"
+              onClick={handleMetadataSubmit}
+              className="flex items-center gap-1 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90"
+            >
+              Continua <ArrowRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'rpe' && staged && (
+        <div className="flex flex-col gap-4">
+          {staged.warnings.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-ink-secondary">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-status-warning" />
+              <div>
+                <p className="font-medium text-ink">{staged.warnings.length} avvisi durante l'import</p>
+                <ul className="mt-1 list-inside list-disc text-xs">
+                  {staged.warnings.slice(0, 8).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                  {staged.warnings.length > 8 && <li>… e altri {staged.warnings.length - 8}</li>}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <p className="mb-3 text-sm text-ink-secondary">
+              RPE opzionale (scala 1-10) per calcolare lo sRPE — puoi saltare e inserirlo più tardi.
+            </p>
+            <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+              {players.map((p) => (
+                <label key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-ink">{p.displayName}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={rpeByPlayerId[p.id] ?? ''}
+                    onChange={(e) =>
+                      setRpeByPlayerId((prev) => ({ ...prev, [p.id]: Number(e.target.value) }))
+                    }
+                    className="w-16 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-ink"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-between">
+            <button
+              type="button"
+              onClick={() => setStep('metadata')}
+              className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-ink-secondary hover:bg-ink/5"
+            >
+              <ArrowLeft className="size-4" /> Indietro
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleFinish}
+              className="flex items-center gap-1 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+            >
+              {saving ? 'Salvataggio…' : 'Salva sessione'} <Check className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
+          <Check className="size-8 text-status-good" />
+          <p className="text-base font-medium text-ink">Sessione importata</p>
+          <p className="text-sm text-ink-secondary">
+            {staged?.rawRowCount} righe elaborate, {staged?.warnings.length ?? 0} avvisi.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90"
+          >
+            Vai alla dashboard
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StepHeader({ step }: { step: Step }) {
+  const steps: { key: Step; label: string }[] = [
+    { key: 'select', label: 'File' },
+    { key: 'metadata', label: 'Sessione' },
+    { key: 'rpe', label: 'RPE' },
+    { key: 'done', label: 'Fatto' },
+  ]
+  const currentIndex = steps.findIndex((s) => s.key === step)
+
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+      {steps.map((s, i) => (
+        <div key={s.key} className="flex items-center gap-2">
+          <span
+            className={
+              i <= currentIndex
+                ? 'flex size-5 items-center justify-center rounded-full bg-accent text-accent-ink'
+                : 'flex size-5 items-center justify-center rounded-full border border-border'
+            }
+          >
+            {i + 1}
+          </span>
+          <span className={i === currentIndex ? 'text-ink' : ''}>{s.label}</span>
+          {i < steps.length - 1 && <span className="mx-1 text-border">—</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FileDropZone({ onFile, error }: { onFile: (file: File) => void; error: string | null }) {
+  const [dragOver, setDragOver] = useState(false)
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setDragOver(false)
+        const file = e.dataTransfer.files[0]
+        if (file) onFile(file)
+      }}
+      className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-12 text-center transition-colors ${
+        dragOver ? 'border-accent bg-accent/5' : 'border-border'
+      }`}
+    >
+      <Upload className="size-8 text-ink-muted" strokeWidth={1.5} />
+      <p className="text-sm font-medium text-ink">Trascina qui il CSV della sessione</p>
+      <p className="text-xs text-ink-secondary">oppure</p>
+      <label className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90">
+        Scegli file
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) onFile(file)
+          }}
+        />
+      </label>
+      {error && (
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-status-critical">
+          <AlertTriangle className="size-4" /> {error}
+        </p>
+      )}
+    </div>
+  )
+}
