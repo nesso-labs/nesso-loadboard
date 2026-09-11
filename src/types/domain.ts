@@ -175,21 +175,3 @@ export interface AppSettings {
   }
 }
 
-/** Derived, computed on demand from a session's segments — not persisted as-is. */
-export interface PlayerSessionAggregate {
-  sessionId: string
-  playerId: string
-  durationMin: number
-  totalDistanceM: number
-  distanceAbove14_4M: number
-  distanceAbove19_8M: number
-  distanceAbove25_2M: number
-  mechanicalWork: number
-  mechanicalWorkPerMin: number
-  maxSpeedKmh: number
-  pctMaxSpeedPeak: number
-  sprintCount: number
-  rpe?: number
-  sRpe?: number
-  dataCompleteness: 'full' | 'partial_no_full_session_row'
-}

@@ -1,4 +1,4 @@
-import type { AppSettings, DrillSegment, PlayerSessionAggregate, ZoneNumber } from '../../types/domain'
+import type { AppSettings, DrillSegment, ZoneNumber } from '../../types/domain'
 
 function zoneAcc(segment: DrillSegment, zone: ZoneNumber): number {
   if (zone === 3) return segment.accZone3
@@ -78,51 +78,6 @@ export function maxSpeedVacancyVsPersonalBestPct(segment: DrillSegment, personal
 export function approximateWorkRestRatio(segment: DrillSegment): number | null {
   const rest = segment.totalDistanceM - segment.hsrM
   return rest > 0 ? segment.hsrM / rest : null
-}
-
-export function aggregateFromFullSession(
-  sessionId: string,
-  playerId: string,
-  fullSession: DrillSegment | undefined,
-  allPlayerSegments: DrillSegment[],
-  settings: AppSettings,
-  rpe?: number,
-): PlayerSessionAggregate {
-  const durationSec = fullSession
-    ? fullSession.durationSec
-    : allPlayerSegments.reduce((sum, s) => sum + s.durationSec, 0)
-  const totalDistanceM = fullSession
-    ? fullSession.totalDistanceM
-    : allPlayerSegments.reduce((sum, s) => sum + s.totalDistanceM, 0)
-
-  const durationMin = durationSec / 60
-  const sRpe = rpe !== undefined ? rpe * durationMin : undefined
-
-  return {
-    sessionId,
-    playerId,
-    durationMin,
-    totalDistanceM,
-    distanceAbove14_4M: fullSession
-      ? distanceAbove14_4(fullSession)
-      : allPlayerSegments.reduce((sum, s) => sum + distanceAbove14_4(s), 0),
-    distanceAbove19_8M: fullSession
-      ? distanceAbove19_8(fullSession)
-      : allPlayerSegments.reduce((sum, s) => sum + distanceAbove19_8(s), 0),
-    distanceAbove25_2M: fullSession
-      ? distanceAbove25_2(fullSession)
-      : allPlayerSegments.reduce((sum, s) => sum + distanceAbove25_2(s), 0),
-    mechanicalWork: fullSession
-      ? mechanicalWork(fullSession, settings)
-      : allPlayerSegments.reduce((sum, s) => sum + mechanicalWork(s, settings), 0),
-    mechanicalWorkPerMin: fullSession ? mechanicalWorkPerMin(fullSession, settings) : 0,
-    maxSpeedKmh: Math.max(0, ...allPlayerSegments.map((s) => s.maxSpeedKmh)),
-    pctMaxSpeedPeak: Math.max(0, ...allPlayerSegments.map((s) => s.pctMaxSpeed)),
-    sprintCount: allPlayerSegments.reduce((sum, s) => sum + sprintCount(s, settings), 0),
-    rpe,
-    sRpe,
-    dataCompleteness: fullSession ? 'full' : 'partial_no_full_session_row',
-  }
 }
 
 export function isGameLikeDrill(drillTitle: string, settings: AppSettings): boolean {
