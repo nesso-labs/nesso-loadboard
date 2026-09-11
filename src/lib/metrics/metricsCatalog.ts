@@ -84,3 +84,23 @@ export function isGameLikeDrill(drillTitle: string, settings: AppSettings): bool
   const lower = drillTitle.toLowerCase()
   return settings.gameDrillKeywords.some((kw) => lower.includes(kw.toLowerCase()))
 }
+
+/** One metric trackable as a % of the historical "textbook" microcycle load — see lib/metrics/microcycle.ts. */
+export interface MicrocycleMetricDef {
+  key: string
+  label: string
+  unit: string
+  metric: (segment: DrillSegment, settings: AppSettings) => number
+}
+
+/** Every load metric the app tracks, offered for microcycle-completion comparison — not just total distance. */
+export const MICROCYCLE_METRICS: MicrocycleMetricDef[] = [
+  { key: 'totalDistance', label: 'Distanza totale', unit: 'm', metric: (s) => s.totalDistanceM },
+  { key: 'hsr', label: 'Distanza alta velocità (HSR, >19.8 km/h)', unit: 'm', metric: (s) => distanceAbove19_8(s) },
+  { key: 'sprintDistance', label: 'Distanza sprint (>25.2 km/h)', unit: 'm', metric: (s) => distanceAbove25_2(s) },
+  { key: 'sprintCount', label: 'Sprint (numero)', unit: '', metric: (s, settings) => sprintCount(s, settings) },
+  { key: 'mechanicalWork', label: 'Mechanical work (acc+dec)', unit: '', metric: (s, settings) => mechanicalWork(s, settings) },
+  { key: 'accHigh', label: 'Accelerazioni alte', unit: '', metric: (s, settings) => accHighCount(s, settings) },
+  { key: 'decHigh', label: 'Decelerazioni alte', unit: '', metric: (s, settings) => decHighCount(s, settings) },
+  { key: 'duration', label: 'Durata', unit: 'min', metric: (s) => s.durationSec / 60 },
+]
