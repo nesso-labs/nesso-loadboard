@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { MobileNavDrawer } from './MobileNavDrawer'
+import { PrintHeader } from './PrintHeader'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -19,6 +20,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onOpenMobileNav={() => setMobileNavOpen(true)} />
         <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+          <PrintHeader />
           <Outlet />
         </main>
       </div>

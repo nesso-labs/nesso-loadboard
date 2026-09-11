@@ -99,4 +99,28 @@ body {
   .no-print {
     display: none !important;
   }
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .print-page-title {
+    display: block !important;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+}
+
+.print-page-title {
+  display: none;
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, Upload } from 'lucide-react'
+import { ChevronDown, Menu, Printer, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useCurrentSession } from '../../state/CurrentSessionContext'
@@ -63,6 +63,15 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
             )}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+        >
+          <Printer className="size-3.5" />
+          Stampa / PDF
+        </button>
 
         <Link
           to="/sessions"
