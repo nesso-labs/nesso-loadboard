@@ -93,9 +93,7 @@ export function ComparePage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Scegli i giocatori (max {MAX_PLAYERS})
-        </p>
+        <p className="mb-2 text-sm font-medium text-ink-secondary">Scegli fino a {MAX_PLAYERS} giocatori</p>
         <div className="flex flex-wrap gap-2">
           {fullSessionSegs.map((s) => {
             const idx = selectedIds.indexOf(s.playerId)
@@ -132,12 +130,12 @@ export function ComparePage() {
                 <span className="font-medium text-ink">{playerById.get(s.playerId)?.displayName}</span>
               </div>
             ))}
-            <span className="text-ink-muted">· mediana squadra (n={fullSessionSegs.length}) come riferimento</span>
+            <span className="text-ink-muted">La riga grigia sulle barre è la mediana squadra (n={fullSessionSegs.length})</span>
           </div>
 
           {sections.map((section) => (
-            <div key={section.title} className="rounded-lg border border-border bg-surface p-4">
-              <p className="mb-3 text-sm font-semibold text-ink">{section.title}</p>
+            <div key={section.title} className="panel p-4">
+              <p className="font-display mb-3 text-base font-medium text-ink">{section.title}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {section.metrics.map((metric) => {
                   const allValues = fullSessionSegs.map(metric.getValue)
@@ -165,7 +163,7 @@ export function ComparePage() {
                               />
                             </div>
                             <span className="w-24 shrink-0 text-right tabular-nums text-ink">
-                              {format(value)} · {pct.toFixed(0)}°
+                              {format(value)} <span className="text-ink-muted">({pct.toFixed(0)}°)</span>
                             </span>
                           </div>
                         )

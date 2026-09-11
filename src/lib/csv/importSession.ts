@@ -1,4 +1,4 @@
-import type { Player, ReassignmentAudit, RpeEntry, Session, SessionType } from '../../types/domain'
+import type { Player, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
 import { listPlayers, putPlayer, putRpeEntries, putSegments, putSession } from '../db/repo'
 import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
@@ -9,6 +9,7 @@ export interface SessionMetadataInput {
   date: string
   label: string
   type: SessionType
+  trainingType?: TrainingType
 }
 
 export interface StagedImport {
@@ -49,6 +50,7 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
     date: staged.metadata.date,
     label: staged.metadata.label,
     type: staged.metadata.type,
+    trainingType: staged.metadata.type === 'training' ? staged.metadata.trainingType : undefined,
     importedAt: now,
     sourceFileName: staged.sourceFileName,
     rawRowCount: staged.rawRowCount,

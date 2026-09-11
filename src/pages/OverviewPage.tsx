@@ -3,9 +3,17 @@ import { Link } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity } from '../lib/metrics/alerts'
+import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { usePlayersQuery, useRpeBySessionQuery, useSegmentsBySessionQuery, useSettingsQuery } from '../state/queries'
+import {
+  useAllSegmentsQuery,
+  usePlayersQuery,
+  useRpeBySessionQuery,
+  useSegmentsBySessionQuery,
+  useSettingsQuery,
+} from '../state/queries'
+import { TRAINING_TYPE_LABEL } from '../types/domain'
 
 const SEVERITY_STYLE: Record<AlertSeverity, string> = {
   critical: 'bg-status-critical/15 text-status-critical',
@@ -19,6 +27,7 @@ export function OverviewPage() {
   const { data: rpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const { data: settings } = useSettingsQuery()
   const { data: players = [] } = usePlayersQuery()
+  const { data: allSegments = [] } = useAllSegmentsQuery()
 
   if (isLoading) return null
 
@@ -50,12 +59,39 @@ export function OverviewPage() {
   const playerById = new Map(players.map((p) => [p.id, p]))
   const flags = settings ? computeSessionAlerts(fullSessionRows, rpe, settings) : []
 
+  const activePlayers = players.filter((p) => p.active)
+  const microcycleByPlayer = activePlayers
+    .map((p) => ({
+      player: p,
+      result: computeMicrocycleCompletion(
+        p.id,
+        sessions,
+        allSegments.filter((s) => s.playerId === p.id),
+        (s) => s.totalDistanceM,
+      ),
+    }))
+    .filter((r) => r.result.pct !== null)
+    .sort((a, b) => (a.result.pct ?? 0) - (b.result.pct ?? 0))
+  const teamAvgMicrocyclePct =
+    microcycleByPlayer.length > 0
+      ? microcycleByPlayer.reduce((sum, r) => sum + (r.result.pct ?? 0), 0) / microcycleByPlayer.length
+      : null
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-ink-secondary">
-          {currentSession?.date} · {currentSession?.label} · {currentSession?.type === 'match' ? 'Partita' : 'Allenamento'}
-        </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="font-display text-xl font-medium text-ink">{currentSession?.label}</h2>
+        <span className="rounded-full bg-ink/8 px-2.5 py-0.5 text-xs font-medium text-ink-secondary">
+          {currentSession?.date}
+        </span>
+        <span className="rounded-full bg-ink/8 px-2.5 py-0.5 text-xs font-medium text-ink-secondary">
+          {currentSession?.type === 'match' ? 'Partita' : 'Allenamento'}
+        </span>
+        {currentSession?.type === 'training' && currentSession.trainingType && (
+          <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">
+            {TRAINING_TYPE_LABEL[currentSession.trainingType]}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -65,9 +101,9 @@ export function OverviewPage() {
         <StatTile label="Vmax sessione" value={formatNumber(maxSpeed, 1)} unit="km/h" accent />
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="panel p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-ink">Alert di questa sessione</p>
+          <p className="font-display text-base font-medium text-ink">Alert di questa sessione</p>
           <Link to="/alerts" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
             Vedi tutti <ArrowRight className="size-3.5" />
           </Link>
@@ -91,6 +127,37 @@ export function OverviewPage() {
           </ul>
         )}
       </div>
+
+      {microcycleByPlayer.length > 0 && (
+        <div className="panel p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-display text-base font-medium text-ink">Completamento microciclo — squadra</p>
+            <Link to="/players" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
+              Vedi per giocatore <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+          <p className="mb-3 text-sm text-ink-secondary">
+            Media squadra:{' '}
+            <span className="font-display text-lg font-semibold tabular-nums text-ink">
+              {teamAvgMicrocyclePct?.toFixed(0)}%
+            </span>{' '}
+            del carico di una settimana tipo storica, da giocatore attivo con dati sufficienti.
+          </p>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            {microcycleByPlayer.slice(0, 12).map(({ player, result }) => (
+              <div key={player.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
+                <span className="truncate text-ink-secondary">{player.displayName}</span>
+                <span className="shrink-0 tabular-nums text-ink">
+                  {result.pct?.toFixed(0)}%{result.lowSample && <span className="text-status-warning">*</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+          {microcycleByPlayer.length > 12 && (
+            <p className="mt-2 text-xs text-ink-muted">+ altri {microcycleByPlayer.length - 12} giocatori</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

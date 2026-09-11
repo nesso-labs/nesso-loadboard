@@ -83,7 +83,7 @@ export function SessionVGamePage() {
         <span className="font-medium text-ink">{gameSegs[0]?.drillTitle}</span> — media per giocatore.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-surface p-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 panel p-5 md:grid-cols-2">
         <div className="md:col-span-2">
           <p className="mb-3 text-sm font-semibold text-ink">Volume</p>
         </div>
@@ -100,7 +100,7 @@ export function SessionVGamePage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 rounded-lg border border-border bg-surface p-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 panel p-5 md:grid-cols-2">
         <div className="md:col-span-2">
           <p className="mb-3 text-sm font-semibold text-ink">Intensità (per minuto)</p>
         </div>
@@ -132,7 +132,7 @@ export function SessionVGamePage() {
 
       <div>
         <p className="mb-3 text-sm font-semibold text-ink">Riepilogo per drill (media squadra)</p>
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="overflow-x-auto panel">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">

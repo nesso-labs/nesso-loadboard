@@ -3,9 +3,11 @@ import { useState } from 'react'
 import { CsvImportError } from '../lib/csv/parseSessionCsv'
 import { commitImport, stageImport, type StagedImport } from '../lib/csv/importSession'
 import { listPlayers } from '../lib/db/repo'
-import type { Player, SessionType } from '../types/domain'
+import { TRAINING_TYPE_LABEL, type Player, type SessionType, type TrainingType } from '../types/domain'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useInvalidateAfterImport } from '../state/queries'
+
+const TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico_alte_velocita', 'rifinitura', 'recupero_attivo', 'mix']
 
 type Step = 'select' | 'metadata' | 'rpe' | 'done'
 
@@ -31,6 +33,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [date, setDate] = useState(todayIso())
   const [label, setLabel] = useState('')
   const [type, setType] = useState<SessionType>('training')
+  const [trainingType, setTrainingType] = useState<TrainingType>('mix')
   const [staged, setStaged] = useState<StagedImport | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
@@ -52,7 +55,12 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
 
   async function handleMetadataSubmit() {
     try {
-      const result = await stageImport(fileText, fileName, { date, label: label || fileName, type })
+      const result = await stageImport(fileText, fileName, {
+        date,
+        label: label || fileName,
+        type,
+        trainingType: type === 'training' ? trainingType : undefined,
+      })
       setStaged(result)
       const allPlayers = await listPlayers()
       const involvedIds = new Set(result.segments.map((s) => s.playerId))
@@ -87,7 +95,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
       )}
 
       {step === 'metadata' && (
-        <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-5">
+        <div className="flex flex-col gap-4 panel p-5">
           <p className="text-sm text-ink-secondary">
             File: <span className="font-medium text-ink">{fileName}</span> — il CSV non contiene data/etichetta, indicale qui.
           </p>
@@ -121,6 +129,25 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
               <option value="match">Partita</option>
             </select>
           </label>
+          {type === 'training' && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-ink">Tipologia allenamento</span>
+              <select
+                value={trainingType}
+                onChange={(e) => setTrainingType(e.target.value as TrainingType)}
+                className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+              >
+                {TRAINING_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {TRAINING_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-ink-muted">
+                Usata in Session v Session per confrontare allenamenti dello stesso tipo.
+              </span>
+            </label>
+          )}
           <div className="flex justify-between pt-2">
             <button
               type="button"
@@ -157,7 +184,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
             </div>
           )}
 
-          <div className="rounded-lg border border-border bg-surface p-5">
+          <div className="panel p-5">
             <p className="mb-3 text-sm text-ink-secondary">
               RPE opzionale (scala 1-10) per calcolare lo sRPE — puoi saltare e inserirlo più tardi.
             </p>
@@ -201,7 +228,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
       )}
 
       {step === 'done' && (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
+        <div className="flex flex-col items-center gap-3 panel p-8 text-center">
           <Check className="size-8 text-status-good" />
           <p className="text-base font-medium text-ink">Sessione importata</p>
           <p className="text-sm text-ink-secondary">

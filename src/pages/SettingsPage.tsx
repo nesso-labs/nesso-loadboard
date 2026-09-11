@@ -67,7 +67,7 @@ export function SettingsPage() {
         Soglie usate da tutte le pagine (Drills, Alerts, Session v Game, Leaderboard). Nessun valore è hardcoded.
       </p>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <section className="flex flex-col gap-3 panel p-4">
         <p className="text-sm font-semibold text-ink">Soglie di velocità (km/h)</p>
         <div className="grid grid-cols-3 gap-3">
           {(['zone4MinKmh', 'zone5MinKmh', 'zone6MinKmh'] as const).map((key, i) => (
@@ -87,7 +87,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <section className="flex flex-col gap-3 panel p-4">
         <p className="text-sm font-semibold text-ink">Mechanical Work &amp; Acc/Dec</p>
         <ZoneCheckboxGroup
           label="Zone incluse nel Mechanical Work"
@@ -116,7 +116,7 @@ export function SettingsPage() {
         />
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <section className="flex flex-col gap-3 panel p-4">
         <p className="text-sm font-semibold text-ink">Sprint &amp; drill "di gara"</p>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="text-ink-secondary">Zone che contano come sprint</span>
@@ -149,7 +149,7 @@ export function SettingsPage() {
         </label>
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <section className="flex flex-col gap-3 panel p-4">
         <p className="text-sm font-semibold text-ink">RPE &amp; trend</p>
         <div className="grid grid-cols-3 gap-3">
           <label className="flex flex-col gap-1 text-xs text-ink-secondary">
@@ -182,7 +182,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <section className="flex flex-col gap-3 panel p-4">
         <p className="text-sm font-semibold text-ink">Soglie di alert</p>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-xs text-ink-secondary">

@@ -56,7 +56,7 @@ export function AlertsPage() {
           description="Nessun giocatore supera le soglie configurate in Settings."
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <div className="overflow-x-auto panel">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">

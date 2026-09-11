@@ -26,7 +26,7 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         <Menu className="size-5" />
       </button>
 
-      <h1 className="truncate text-sm font-semibold text-ink">{pageLabel}</h1>
+      <h1 className="font-display truncate text-base font-medium text-ink">{pageLabel}</h1>
 
       <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
         {sessions.length > 0 && (
@@ -36,13 +36,13 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
               onClick={() => setPickerOpen((v) => !v)}
               className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 sm:gap-1.5 sm:px-3"
             >
-              <span className="max-w-20 truncate sm:max-w-40">
-                {currentSession ? `${currentSession.date} · ${currentSession.label}` : 'Seleziona sessione'}
+              <span className="max-w-24 truncate sm:max-w-44">
+                {currentSession ? currentSession.label : 'Seleziona sessione'}
               </span>
               <ChevronDown className="size-3.5 shrink-0" />
             </button>
             {pickerOpen && (
-              <div className="absolute right-0 z-40 mt-1 w-64 rounded-md border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute right-0 z-40 mt-1 w-64 border border-border bg-surface-raised py-1 shadow-lg">
                 {sessions.map((s) => (
                   <button
                     key={s.id}

@@ -26,14 +26,14 @@ export function MetricTrendPanel({ title, unit, points, rolling, latestValue, fo
   const data = points.map((p, i) => ({ ...p, rolling: rolling[i] }))
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="panel p-4">
       <div className="mb-2 flex items-baseline justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+        <p className="text-sm font-medium text-ink-secondary">
           {title}
-          {unit && <span className="ml-1 normal-case">({unit})</span>}
+          {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
         </p>
         {latestValue !== undefined && (
-          <span className="text-sm font-semibold tabular-nums text-ink">{format(latestValue)}</span>
+          <span className="font-display text-lg font-semibold tabular-nums text-ink">{format(latestValue)}</span>
         )}
       </div>
       <ResponsiveContainer width="100%" height={120}>

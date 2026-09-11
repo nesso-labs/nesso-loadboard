@@ -34,7 +34,7 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
   const fmt = (col: HeatmapColumn<T>, value: number) => (col.format ? col.format(value) : value.toFixed(1))
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+    <div className="overflow-x-auto panel">
       <table className="w-full whitespace-nowrap text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">

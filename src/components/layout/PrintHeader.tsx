@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { useCurrentSession } from '../../state/CurrentSessionContext'
+import { TRAINING_TYPE_LABEL } from '../../types/domain'
 import { NAV_ITEMS } from './navItems'
 
 /** Only visible when printing (see .print-page-title in index.css) — the
@@ -11,10 +12,15 @@ export function PrintHeader() {
 
   return (
     <div className="print-page-title mb-4 border-b border-border pb-2">
-      <p className="text-lg font-semibold text-ink">LoadBoard — {match?.label ?? ''}</p>
+      <p className="font-display text-lg font-medium text-ink">
+        LoadBoard <span className="text-ink-secondary">{match?.label ?? ''}</span>
+      </p>
       {currentSession && (
         <p className="text-sm text-ink-secondary">
-          {currentSession.date} · {currentSession.label} · {currentSession.type === 'match' ? 'Partita' : 'Allenamento'}
+          {currentSession.label}, {currentSession.date}
+          {', '}
+          {currentSession.type === 'match' ? 'Partita' : 'Allenamento'}
+          {currentSession.trainingType ? ` (${TRAINING_TYPE_LABEL[currentSession.trainingType]})` : ''}
         </p>
       )}
     </div>

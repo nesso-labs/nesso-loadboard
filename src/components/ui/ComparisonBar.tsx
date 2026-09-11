@@ -22,9 +22,9 @@ export function ComparisonBar({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+      <p className="text-sm font-medium text-ink-secondary">
         {label}
-        {unit && <span className="ml-1 normal-case">({unit})</span>}
+        {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
       </p>
       <Bar label={primaryLabel} value={primaryValue} max={max} format={format} accent />
       <Bar label={referenceLabel} value={referenceValue} max={max} format={format} />

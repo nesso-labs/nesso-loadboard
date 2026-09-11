@@ -3,8 +3,15 @@ import { useMemo, useState } from 'react'
 import { TrendLine } from '../components/charts/TrendLine'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
+import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
 import { usePlayersQuery, useSegmentsByPlayerQuery, useSessionsQuery } from '../state/queries'
+
+const DENOMINATOR_CAPTION: Record<string, string> = {
+  'valid-cycles': 'vs media dei microcicli storici completi (Ripresa+Forza+Metabolico+Rifinitura)',
+  'per-type-fallback': 'vs media per tipologia — nessun microciclo storico completo ancora disponibile',
+  'insufficient-data': 'dati storici insufficienti per un confronto',
+}
 
 export function PlayerProfilePage() {
   const { data: players = [], isLoading: loadingPlayers } = usePlayersQuery()
@@ -39,6 +46,9 @@ export function PlayerProfilePage() {
   const avgDistance =
     fullSessionSegs.length > 0 ? fullSessionSegs.reduce((sum, r) => sum + r.segment.totalDistanceM, 0) / fullSessionSegs.length : 0
   const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
+  const microcycle = activePlayerId
+    ? computeMicrocycleCompletion(activePlayerId, sessions, segments, (s) => s.totalDistanceM)
+    : null
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,8 +89,26 @@ export function PlayerProfilePage() {
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
 
+          {microcycle && (
+            <div className="panel p-4">
+              <p className="font-display mb-1 text-base font-medium text-ink">Completamento microciclo attuale</p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-display text-3xl font-semibold tabular-nums text-ink">
+                  {microcycle.pct !== null ? `${microcycle.pct.toFixed(0)}%` : '—'}
+                  {microcycle.lowSample && <span className="ml-1 text-xl text-status-warning">*</span>}
+                </span>
+                <span className="text-sm text-ink-muted">{DENOMINATOR_CAPTION[microcycle.denominatorSource]}</span>
+              </div>
+              <p className="mt-2 text-xs text-ink-muted">
+                Carico (distanza totale) dalle {microcycle.sessionsSinceLastMatch} sedute svolte dall'ultima partita a
+                oggi{microcycle.validCycleCount > 0 && `, su ${microcycle.validCycleCount} microcicli storici validi`}.
+                {microcycle.lowSample && ' * poche sessioni finora in questo microciclo: percentuale poco affidabile.'}
+              </p>
+            </div>
+          )}
+
           {fullSessionSegs.length >= 2 ? (
-            <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="panel p-4">
               <p className="mb-2 text-sm font-semibold text-ink">Distanza totale nel tempo</p>
               <TrendLine
                 data={fullSessionSegs.map((r) => ({ x: r.session.date, value: r.segment.totalDistanceM }))}
@@ -97,7 +125,7 @@ export function PlayerProfilePage() {
 
           <div>
             <p className="mb-3 text-sm font-semibold text-ink">Storico sessioni</p>
-            <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+            <div className="overflow-x-auto panel">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">

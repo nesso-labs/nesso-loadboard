@@ -6,6 +6,18 @@ export type SegmentKind = 'full_session' | 'warmup' | 'drill'
 export type SessionType = 'training' | 'match'
 export type Position = 'GK' | 'DEF' | 'MID' | 'FWD' | 'UNSPECIFIED'
 
+/** Sub-classification of a training session — lets the trainer compare like-for-like (e.g. Forza vs Forza), not just training-vs-training. Not applicable to matches. */
+export type TrainingType = 'ripresa' | 'forza' | 'metabolico_alte_velocita' | 'rifinitura' | 'recupero_attivo' | 'mix'
+
+export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
+  ripresa: 'Ripresa',
+  forza: 'Forza',
+  metabolico_alte_velocita: 'Metabolico + alte velocità',
+  rifinitura: 'Rifinitura',
+  recupero_attivo: 'Recupero attivo',
+  mix: 'Mix',
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string
@@ -53,6 +65,8 @@ export interface Session {
   date: string // ISO "YYYY-MM-DD"
   label: string
   type: SessionType
+  /** Only meaningful when type === 'training'. */
+  trainingType?: TrainingType
   importedAt: string
   sourceFileName?: string
   rawRowCount: number

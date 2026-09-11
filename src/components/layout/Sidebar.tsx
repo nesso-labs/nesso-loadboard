@@ -12,10 +12,10 @@ export function Sidebar({ className }: { className?: string }) {
           end={item.path === '/'}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              'flex items-center gap-3 border-l-2 py-2 pl-3 pr-3 text-sm font-medium transition-colors',
               isActive
-                ? 'bg-accent/10 text-accent'
-                : 'text-ink-secondary hover:bg-ink/5 hover:text-ink',
+                ? 'border-accent bg-accent/10 text-ink'
+                : 'border-transparent text-ink-secondary hover:border-border hover:bg-ink/5 hover:text-ink',
             )
           }
         >

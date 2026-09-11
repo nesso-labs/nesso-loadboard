@@ -101,9 +101,9 @@ export function WeeklyRunningPage() {
             .sort((a, b) => b.pct - a.pct)
 
           return (
-            <div key={metric.key} className="rounded-lg border border-border bg-surface p-4">
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                {metric.label} <span className="normal-case">({metric.unit})</span>
+            <div key={metric.key} className="panel p-4">
+              <p className="mb-3 text-sm font-medium text-ink-secondary">
+                {metric.label} <span className="text-ink-muted">({metric.unit})</span>
               </p>
               <div className="flex items-center gap-2 pb-2 text-xs font-semibold text-ink">
                 <span className="w-28 shrink-0">Squadra</span>

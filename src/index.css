@@ -1,26 +1,28 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — from the `dataviz` skill's validated reference palette
- * (references/palette.md). Light values declared via @theme (also becomes
- * Tailwind utilities, e.g. bg-accent/text-ink-secondary); dark values
- * override the same custom properties at runtime so utilities stay in sync
- * automatically. Accent = the palette's "orange" categorical slot, used as
- * the single warm accent for "current session / active" emphasis.
+ * LoadBoard visual identity — "night match under floodlights."
+ * Base palette is a pitch-tinted dark (not a neutral near-black) with a
+ * single trophy-gold accent, distinct from the fixed status/categorical
+ * hues below. Categorical + status + diverging heatmap colors are the
+ * `dataviz` skill's validated reference values (re-checked against these
+ * new surfaces with scripts/validate_palette.js) — never re-themed.
  */
 @theme {
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Oswald", "IBM Plex Sans", system-ui, sans-serif;
 
-  --color-page: #f9f9f7;
-  --color-surface: #fcfcfb;
-  --color-ink: #0b0b0b;
-  --color-ink-secondary: #52514e;
-  --color-ink-muted: #898781;
-  --color-grid: #e1e0d9;
-  --color-baseline: #c3c2b7;
-  --color-border: rgba(11, 11, 11, 0.1);
+  --color-page: #eff2ec;
+  --color-surface: #f9faf6;
+  --color-surface-raised: #ffffff;
+  --color-ink: #10201a;
+  --color-ink-secondary: #45564c;
+  --color-ink-muted: #7c8b82;
+  --color-grid: rgba(16, 32, 26, 0.08);
+  --color-baseline: rgba(16, 32, 26, 0.18);
+  --color-border: rgba(16, 32, 26, 0.12);
 
-  --color-accent: #eb6834;
+  --color-accent: #8a6a19;
   --color-accent-ink: #ffffff;
 
   --color-series-blue: #2a78d6;
@@ -37,9 +39,6 @@
   --color-status-serious: #ec835a;
   --color-status-critical: #d03b3b;
 
-  /* Diverging heatmap fills (Drills table) — blue/red poles from the
-     categorical palette, low-alpha so cell text (ink) stays legible; the
-     number itself always carries the value, the tint is a secondary cue. */
   --heat-low-strong: rgba(42, 120, 214, 0.24);
   --heat-low-mild: rgba(42, 120, 214, 0.1);
   --heat-high-mild: rgba(227, 73, 72, 0.1);
@@ -48,17 +47,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-page: #0d0d0d;
-    --color-surface: #1a1a19;
-    --color-ink: #ffffff;
-    --color-ink-secondary: #c3c2b7;
-    --color-ink-muted: #898781;
-    --color-grid: #2c2c2a;
-    --color-baseline: #383835;
-    --color-border: rgba(255, 255, 255, 0.1);
+    --color-page: #0a1512;
+    --color-surface: #10201b;
+    --color-surface-raised: #17281f;
+    --color-ink: #f3f1e4;
+    --color-ink-secondary: #9fb0a6;
+    --color-ink-muted: #5e6f65;
+    --color-grid: rgba(159, 176, 166, 0.14);
+    --color-baseline: rgba(159, 176, 166, 0.28);
+    --color-border: rgba(159, 176, 166, 0.16);
 
-    --color-accent: #d95926;
-    --color-accent-ink: #ffffff;
+    --color-accent: #d4af37;
+    --color-accent-ink: #0a1512;
 
     --color-series-blue: #3987e5;
     --color-series-orange: #d95926;
@@ -86,6 +86,7 @@ body {
   margin: 0;
   background: var(--color-page);
   color: var(--color-ink-secondary);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -93,6 +94,34 @@ body {
 /* Numeric table/axis columns should align vertically. */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* The display face carries the "broadcast scoreboard" personality — used
+   for hero numbers, section nameplates, and the brand mark only. */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* One consistent, quiet structural device for every content panel: a flat
+   surface with a sharp (not soft-rounded) corner and a single hairline —
+   no drop shadow, matching the flatness of broadcast data graphics. */
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+}
+
+/* Reserved for the few genuinely emphasized panels (the current session's
+   headline numbers, the leading rank in a leaderboard) — a clipped corner
+   instead of a fourth soft-rounded card, so the emphasis reads as cut from
+   the same sheet as a scoreboard graphic, not just "a card with a border." */
+.panel-accent {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 2px;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
 }
 
 @media print {

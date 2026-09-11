@@ -1,11 +1,11 @@
 import { CalendarRange } from 'lucide-react'
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { EmptyState } from '../components/ui/EmptyState'
 import { median } from '../lib/metrics/heatmap'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import type { DrillSegment, Position } from '../types/domain'
+import { TRAINING_TYPE_LABEL, type DrillSegment, type Position } from '../types/domain'
 
 const MIN_COMPARABLE_SESSIONS = 3
 const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
@@ -24,6 +24,7 @@ export function SessionVSessionPage() {
   const { data: settings } = useSettingsQuery()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const [includeAllTrainingTypes, setIncludeAllTrainingTypes] = useState(false)
 
   if (!currentSession || isLoading || !settings) return null
 
@@ -34,8 +35,16 @@ export function SessionVSessionPage() {
     { key: 'mechw', label: 'MechW (#)', getValue: (s) => mechanicalWork(s, settings) },
   ]
 
+  const strictByTrainingType = currentSession.type === 'training' && !!currentSession.trainingType && !includeAllTrainingTypes
+
   const sameTypeSessionIds = new Set(
-    sessions.filter((s) => s.type === currentSession.type && s.id !== currentSession.id).map((s) => s.id),
+    sessions
+      .filter((s) => {
+        if (s.id === currentSession.id || s.type !== currentSession.type) return false
+        if (strictByTrainingType) return s.trainingType === currentSession.trainingType
+        return true
+      })
+      .map((s) => s.id),
   )
   const currentSegs = segments.filter((s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session')
 
@@ -74,13 +83,28 @@ export function SessionVSessionPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ink-secondary">
-        Confronto tra questa sessione e lo storico dello stesso giocatore, su sessioni dello stesso tipo (
-        {currentSession.type === 'match' ? 'partita' : 'allenamento'}). Servono almeno {MIN_COMPARABLE_SESSIONS}{' '}
-        sessioni storiche per giocatore per un confronto affidabile.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-secondary">
+          Confronto tra questa sessione e lo storico dello stesso giocatore
+          {currentSession.type === 'training' && currentSession.trainingType
+            ? ` su allenamenti dello stesso tipo (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
+            : ` su sessioni dello stesso tipo (${currentSession.type === 'match' ? 'partita' : 'allenamento'})`}
+          . Servono almeno {MIN_COMPARABLE_SESSIONS} sessioni storiche per giocatore per un confronto affidabile.
+        </p>
+        {currentSession.type === 'training' && currentSession.trainingType && (
+          <label className="flex shrink-0 items-center gap-1.5 text-xs text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={includeAllTrainingTypes}
+              onChange={(e) => setIncludeAllTrainingTypes(e.target.checked)}
+              className="accent-accent"
+            />
+            Confronta con tutte le tipologie di allenamento
+          </label>
+        )}
+      </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      <div className="overflow-x-auto panel">
         <table className="w-full whitespace-nowrap text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">

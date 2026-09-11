@@ -110,7 +110,7 @@ export function LeaderboardPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="panel p-4">
         <div className="flex flex-col gap-2">
           {rows.map((row, i) => (
             <div key={row.playerId} className="flex items-center gap-3 text-sm">
