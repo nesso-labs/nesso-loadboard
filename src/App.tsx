@@ -1,14 +1,7 @@
-import {
-  AlertTriangle,
-  BarChart3,
-  CalendarRange,
-  ClipboardList,
-  Settings,
-  Trophy,
-  UserCircle,
-} from 'lucide-react'
+import { BarChart3, CalendarRange, ClipboardList, Settings, Trophy, UserCircle } from 'lucide-react'
 import { Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
+import { AlertsPage } from './pages/AlertsPage'
 import { ComingSoonPage } from './pages/ComingSoonPage'
 import { DrillsPage } from './pages/DrillsPage'
 import { OverviewPage } from './pages/OverviewPage'
@@ -63,16 +56,7 @@ export function App() {
             />
           }
         />
-        <Route
-          path="/alerts"
-          element={
-            <ComingSoonPage
-              icon={AlertTriangle}
-              title="Alerts & Flags"
-              description="Regole di carico/rischio centralizzate — richiede una baseline di almeno una settimana, in arrivo."
-            />
-          }
-        />
+        <Route path="/alerts" element={<AlertsPage />} />
         <Route
           path="/leaderboard"
           element={

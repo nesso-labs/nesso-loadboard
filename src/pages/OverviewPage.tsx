@@ -1,14 +1,24 @@
-import { Upload } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
-import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useSegmentsBySessionQuery } from '../state/queries'
+import { computeSessionAlerts, type AlertSeverity } from '../lib/metrics/alerts'
 import { formatNumber } from '../lib/utils'
+import { useCurrentSession } from '../state/CurrentSessionContext'
+import { usePlayersQuery, useRpeBySessionQuery, useSegmentsBySessionQuery, useSettingsQuery } from '../state/queries'
+
+const SEVERITY_STYLE: Record<AlertSeverity, string> = {
+  critical: 'bg-status-critical/15 text-status-critical',
+  serious: 'bg-status-serious/20 text-status-serious',
+  warning: 'bg-status-warning/20 text-ink',
+}
 
 export function OverviewPage() {
   const { sessions, currentSession, isLoading } = useCurrentSession()
   const { data: segments = [] } = useSegmentsBySessionQuery(currentSession?.id)
+  const { data: rpe = [] } = useRpeBySessionQuery(currentSession?.id)
+  const { data: settings } = useSettingsQuery()
+  const { data: players = [] } = usePlayersQuery()
 
   if (isLoading) return null
 
@@ -37,6 +47,8 @@ export function OverviewPage() {
   const totalHsr = fullSessionRows.reduce((sum, s) => sum + s.hsrM, 0)
   const avgHsr = fullSessionRows.length > 0 ? totalHsr / fullSessionRows.length : 0
   const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
+  const playerById = new Map(players.map((p) => [p.id, p]))
+  const flags = settings ? computeSessionAlerts(fullSessionRows, rpe, settings) : []
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,11 +65,32 @@ export function OverviewPage() {
         <StatTile label="Vmax sessione" value={formatNumber(maxSpeed, 1)} unit="km/h" accent />
       </div>
 
-      <EmptyState
-        icon={Upload}
-        title="Alert e classifiche in arrivo"
-        description="Questa pagina si arricchirà con gli alert di carico e i link rapidi man mano che costruiamo le altre viste."
-      />
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-semibold text-ink">Alert di questa sessione</p>
+          <Link to="/alerts" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
+            Vedi tutti <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+        {flags.length === 0 ? (
+          <div className="flex items-center gap-2 text-sm text-ink-secondary">
+            <ShieldCheck className="size-4 text-status-good" />
+            Nessun alert per questa sessione.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {flags.slice(0, 5).map((flag, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_STYLE[flag.severity]}`}>
+                  {playerById.get(flag.playerId)?.displayName ?? flag.playerId}
+                </span>
+                <span className="truncate text-ink-secondary">{flag.message}</span>
+              </li>
+            ))}
+            {flags.length > 5 && <li className="text-xs text-ink-muted">+ altri {flags.length - 5}</li>}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }

@@ -31,4 +31,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     max: 10,
   },
   rollingWindowDays: 7,
+  alertThresholds: {
+    maxSpeedDeficitPct: 85,
+    highMechWorkRelative: 0.25,
+    highVolumeRelative: 0.25,
+    highSRpeRelative: 0.25,
+  },
 }

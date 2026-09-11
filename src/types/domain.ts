@@ -132,6 +132,14 @@ export interface AppSettings {
   }
   weeklyTargets?: Partial<Record<string, number>>
   rollingWindowDays: number
+  alertThresholds: {
+    /** Below this % of the player's own recorded max speed -> sprint-deficit flag. */
+    maxSpeedDeficitPct: number
+    /** Relative deviation above the session's team median (same bands as the Drills heatmap) -> high-load flag. */
+    highMechWorkRelative: number
+    highVolumeRelative: number
+    highSRpeRelative: number
+  }
 }
 
 /** Derived, computed on demand from a session's segments — not persisted as-is. */
