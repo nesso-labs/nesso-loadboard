@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 /*
- * LoadBoard visual identity — "night match under floodlights."
- * Base palette is a pitch-tinted dark (not a neutral near-black) with a
- * single trophy-gold accent, distinct from the fixed status/categorical
- * hues below. Categorical + status + diverging heatmap colors are the
- * `dataviz` skill's validated reference values (re-checked against these
- * new surfaces with scripts/validate_palette.js) — never re-themed.
+ * LoadBoard visual identity — light mode stays "night match under
+ * floodlights" (pitch-tinted dark, trophy-gold accent). Dark mode (below)
+ * is the primary "Sports Analytics" surface: a cool near-black with a
+ * vivid yellow accent and a blue-tinted hairline on every card/tooltip.
+ * Categorical + status + diverging heatmap hues are the `dataviz` skill's
+ * validated reference values (checked with scripts/validate_palette.js)
+ * — never re-themed; only the accent/border/surface tokens flex per-theme.
  */
 @theme {
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -47,18 +48,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-page: #0a1512;
-    --color-surface: #10201b;
-    --color-surface-raised: #17281f;
-    --color-ink: #f3f1e4;
-    --color-ink-secondary: #9fb0a6;
-    --color-ink-muted: #5e6f65;
-    --color-grid: rgba(159, 176, 166, 0.14);
-    --color-baseline: rgba(159, 176, 166, 0.28);
-    --color-border: rgba(159, 176, 166, 0.16);
+    --color-page: #070c10;
+    --color-surface: #101820;
+    --color-surface-raised: #16212b;
+    --color-ink: #f4f6f9;
+    --color-ink-secondary: #9aabbd;
+    --color-ink-muted: #5c6b7d;
+    --color-grid: rgba(154, 187, 232, 0.12);
+    --color-baseline: rgba(154, 187, 232, 0.24);
+    --color-border: rgba(74, 156, 235, 0.22);
 
-    --color-accent: #d4af37;
-    --color-accent-ink: #0a1512;
+    --color-accent: #f4c430;
+    --color-accent-ink: #070c10;
 
     --color-series-blue: #3987e5;
     --color-series-orange: #d95926;
@@ -73,6 +74,12 @@
     --heat-low-mild: rgba(57, 135, 229, 0.14);
     --heat-high-mild: rgba(230, 103, 103, 0.14);
     --heat-high-strong: rgba(230, 103, 103, 0.32);
+
+    /* Premium "glow" accents — dark-mode only, applied sparingly under key
+       numbers and comparison bars, never as a blanket card shadow. */
+    --glow-accent: 0 6px 20px -4px rgba(244, 196, 48, 0.45);
+    --glow-accent-text: 0 0 18px rgba(244, 196, 48, 0.4);
+    --glow-blue: 0 6px 20px -4px rgba(57, 135, 229, 0.45);
   }
 }
 
@@ -103,13 +110,14 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* One consistent, quiet structural device for every content panel: a flat
-   surface with a sharp (not soft-rounded) corner and a single hairline —
-   no drop shadow, matching the flatness of broadcast data graphics. */
+/* One consistent, quiet structural device for every content panel: a
+   surface that steps up from the page background, a single hairline
+   (blue-tinted in dark mode), and a soft modern radius — no blanket drop
+   shadow, so depth reads from the surface/border step, not a shadow. */
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 3px;
+  border-radius: 12px;
 }
 
 /* Reserved for the few genuinely emphasized panels (the current session's
@@ -120,8 +128,20 @@ body {
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent);
-  border-radius: 2px;
+  border-radius: 10px;
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+
+/* Premium glow accents — see the dark-mode token block above. No-op
+   (falls back to `none`) outside dark mode, so light mode stays flat. */
+.glow-accent {
+  box-shadow: var(--glow-accent, none);
+}
+.glow-blue {
+  box-shadow: var(--glow-blue, none);
+}
+.text-glow-accent {
+  text-shadow: var(--glow-accent-text, none);
 }
 
 @media print {
