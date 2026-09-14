@@ -22,6 +22,11 @@ export async function putSession(session: Session): Promise<void> {
   await apiFetch('/api/sessions', { method: 'POST', body: JSON.stringify(session) })
 }
 
+/** Deletes a session and cascades to its segments and RPE entries. */
+export async function deleteSession(sessionId: string): Promise<void> {
+  await apiFetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
+}
+
 // ---------- players ----------
 
 export async function listPlayers(): Promise<Player[]> {
