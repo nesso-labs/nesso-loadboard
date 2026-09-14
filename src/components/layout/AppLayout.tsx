@@ -9,7 +9,7 @@ function BrandMark() {
   return (
     <div className="flex items-center gap-2 px-1">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 1.5 22 6v6.2c0 6-4.3 9.6-10 10.3-5.7-.7-10-4.3-10-10.3V6z" fill="var(--color-accent)" />
+        <path d="M12 1.5 22 6v6.2c0 6-4.3 9.6-10 10.3-5.7-.7-10-4.3-10-10.3V6z" fill="var(--color-primary)" />
         <path d="M12 1.5 22 6v6.2c0 6-4.3 9.6-10 10.3z" fill="var(--color-ink)" fillOpacity="0.16" />
       </svg>
       <span className="font-display text-lg font-semibold tracking-tight text-ink">LoadBoard</span>
