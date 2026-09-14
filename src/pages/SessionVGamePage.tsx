@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, mechanicalWorkPerMin } from '../lib/metrics/metricsCatalog'
+import { currentMicrocycleSessions } from '../lib/metrics/microcycle'
+import { performanceModelAverage } from '../lib/metrics/performanceModel'
 import { mean } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
@@ -22,6 +24,12 @@ const METRICS: MetricSpec[] = [
   { key: 'd198', label: 'Distanza > 19.8 km/h', unit: 'm', volume: distanceAbove19_8 },
   { key: 'd252', label: 'Distanza > 25.2 km/h', unit: 'm', volume: distanceAbove25_2 },
 ]
+
+/** Power-law taper for the 90'-normalization of a match appearance — steeper for high-speed metrics. */
+const PERFORMANCE_MODEL_ALPHA: Record<string, number> = { td: 0.075, d198: 0.12, d252: 0.12 }
+
+/** Post-match training target, as a multiple of the historical performance model. */
+const TARGET_MULTIPLIER: Record<string, number> = { td: 2.5, d198: 1.5, d252: 1.5 }
 
 export function SessionVGamePage() {
   const { currentSession } = useCurrentSession()
@@ -96,6 +104,36 @@ export function SessionVGamePage() {
     volume: (s) => mechanicalWork(s, settings),
   }
   const allMetrics = [...METRICS, mechWorkSpec]
+
+  // "Gara" volumes: the historical performance model (mean of every valid
+  // match appearance's volume normalized to 90' via power law) — falls back
+  // to the raw mean only if no appearance clears the 15'-played floor.
+  const gamePerformanceModel: Record<string, number> = {}
+  for (const m of METRICS) {
+    gamePerformanceModel[m.key] =
+      performanceModelAverage(playerGameSegs, m.volume, PERFORMANCE_MODEL_ALPHA[m.key]) ??
+      mean(playerGameSegs.map(m.volume))
+  }
+
+  // Post-match cumulative load: every training since the last match, summed
+  // (not averaged) per player, then averaged across players for the team view.
+  const microcycleSessionIds = new Set(currentMicrocycleSessions(sessions).map((s) => s.id))
+  const postMatchFullSegs = segments.filter(
+    (s) => s.segmentKind === 'full_session' && microcycleSessionIds.has(s.sessionId),
+  )
+  const postMatchSum = (volume: (s: DrillSegment) => number): number => {
+    if (activePlayerId) {
+      return postMatchFullSegs
+        .filter((s) => s.playerId === activePlayerId)
+        .reduce((sum, s) => sum + volume(s), 0)
+    }
+    const sumByPlayer = new Map<string, number>()
+    for (const seg of postMatchFullSegs) {
+      sumByPlayer.set(seg.playerId, (sumByPlayer.get(seg.playerId) ?? 0) + volume(seg))
+    }
+    const sums = [...sumByPlayer.values()]
+    return sums.length > 0 ? mean(sums) : 0
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -174,7 +212,11 @@ export function SessionVGamePage() {
         <>
           <div className="grid grid-cols-1 gap-4 panel p-5 md:grid-cols-2">
             <div className="md:col-span-2">
-              <p className="mb-3 text-sm font-semibold text-ink">Volume</p>
+              <p className="mb-1 text-sm font-semibold text-ink">Volume</p>
+              <p className="mb-3 text-xs text-ink-muted">
+                "Gara" è il modello prestativo medio storico: ogni presenza in gara (esclusi subentri sotto i 15')
+                viene normalizzata a 90' con una legge di potenza, poi mediata sull'intero storico.
+              </p>
             </div>
             {allMetrics.map((m) => (
               <ComparisonBar
@@ -184,7 +226,7 @@ export function SessionVGamePage() {
                 primaryLabel="Allenamento"
                 primaryValue={mean(trainingFullSegs.map(m.volume))}
                 referenceLabel="Gara"
-                referenceValue={mean(playerGameSegs.map(m.volume))}
+                referenceValue={m.key in gamePerformanceModel ? gamePerformanceModel[m.key] : mean(playerGameSegs.map(m.volume))}
               />
             ))}
           </div>
@@ -217,6 +259,27 @@ export function SessionVGamePage() {
               referenceValue={mean(playerGameSegs.map((s) => mechanicalWorkPerMin(s, settings)))}
               format={(v) => v.toFixed(2)}
             />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 panel p-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <p className="mb-1 text-sm font-semibold text-ink">Modello prestativo</p>
+              <p className="mb-3 text-xs text-ink-muted">
+                Confronta il carico cumulato negli allenamenti svolti dall'ultima partita a oggi contro un target
+                teorico: 2.5x il modello gara per il volume totale, 1.5x per le distanze ad alta velocità.
+              </p>
+            </div>
+            {METRICS.map((m) => (
+              <ComparisonBar
+                key={m.key}
+                label={m.label}
+                unit={m.unit}
+                primaryLabel="Post-gara"
+                primaryValue={postMatchSum(m.volume)}
+                referenceLabel="Target"
+                referenceValue={gamePerformanceModel[m.key] * TARGET_MULTIPLIER[m.key]}
+              />
+            ))}
           </div>
 
           <div>

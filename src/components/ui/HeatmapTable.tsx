@@ -39,24 +39,32 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey, compa
 
   const fmt = (col: HeatmapColumn<T>, value: number) => (col.format ? col.format(value) : value.toFixed(1))
 
-  const firstColPad = compact ? 'px-3 py-1 print:px-1.5 print:py-0.5' : 'px-4 py-2'
-  const cellPad = compact ? 'px-2 py-1 print:px-1.5 print:py-0.5' : 'px-3 py-2'
+  const firstColPad = compact ? 'px-2 py-1 print:px-1.5 print:py-0.5' : 'px-4 py-2'
+  const cellPad = compact ? 'px-1 py-1 print:px-1.5 print:py-0.5' : 'px-3 py-2'
+  const firstColStyle = compact ? { width: '84px', minWidth: '84px' } : undefined
 
   return (
     <div className={`overflow-x-auto panel ${compact ? 'print:overflow-visible' : ''}`}>
-      <table className={`w-full whitespace-nowrap ${compact ? 'text-xs print:text-[8px]' : 'text-sm'}`}>
+      <table
+        className={`w-full ${compact ? 'text-[11px] leading-tight print:text-[8px]' : 'whitespace-nowrap text-sm'}`}
+        style={compact ? { tableLayout: 'fixed' } : undefined}
+      >
         <thead>
           <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
-            <th className={`sticky left-0 z-10 bg-surface ${firstColPad}`}>Giocatore</th>
+            <th className={`sticky left-0 z-10 bg-surface ${firstColPad}`} style={firstColStyle}>
+              Giocatore
+            </th>
             {columns.map((col) => (
-              <th key={col.key} className={`${cellPad} text-right`}>
+              <th key={col.key} className={`${cellPad} text-right ${compact ? 'break-words normal-case' : ''}`}>
                 {col.label}
                 {col.unit && <span className="ml-1 normal-case text-ink-muted">({col.unit})</span>}
               </th>
             ))}
           </tr>
           <tr className="border-b border-border bg-page/60 text-xs font-semibold text-ink">
-            <td className={`sticky left-0 z-10 bg-page/60 ${firstColPad}`}>Mediana squadra</td>
+            <td className={`sticky left-0 z-10 bg-page/60 ${firstColPad}`} style={firstColStyle}>
+              Mediana squadra
+            </td>
             {medians.map((m, i) => (
               <td key={columns[i].key} className={`${cellPad} text-right tabular-nums`}>
                 {m === null ? '—' : fmt(columns[i], m)}
@@ -79,7 +87,11 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey, compa
               )}
               {group.rows.map((row) => (
                 <tr key={getRowKey(row)} className="border-b border-border last:border-0">
-                  <td className={`sticky left-0 z-10 bg-surface font-medium text-ink ${firstColPad}`}>
+                  <td
+                    className={`sticky left-0 z-10 bg-surface font-medium text-ink ${compact ? 'truncate' : ''} ${firstColPad}`}
+                    style={firstColStyle}
+                    title={compact ? getRowLabel(row) : undefined}
+                  >
                     {getRowLabel(row)}
                   </td>
                   {columns.map((col, i) => {
