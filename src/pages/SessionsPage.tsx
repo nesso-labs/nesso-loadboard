@@ -40,16 +40,19 @@ function SessionRow({ session }: { session: Session }) {
 
   const [panel, setPanel] = useState<Panel>('none')
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [type, setType] = useState<SessionType>(session.type)
   const [trainingType, setTrainingType] = useState<TrainingType>(session.trainingType ?? 'mix')
   const [matchResult, setMatchResult] = useState<MatchResult>(session.matchResult ?? 'win')
   const [matchLocation, setMatchLocation] = useState<MatchLocation>(session.matchLocation ?? 'home')
   const [savingMeta, setSavingMeta] = useState(false)
+  const [metaError, setMetaError] = useState<string | null>(null)
 
   const { data: segments = [] } = useSegmentsBySessionQuery(panel === 'rpe' ? session.id : undefined)
   const [rpeDraft, setRpeDraft] = useState<Record<string, number>>({})
   const [savingRpe, setSavingRpe] = useState(false)
+  const [rpeError, setRpeError] = useState<string | null>(null)
 
   const playerById = new Map(players.map((p) => [p.id, p]))
   const involvedPlayerIds = [...new Set(segments.map((s) => s.playerId))].sort((a, b) =>
@@ -75,26 +78,38 @@ function SessionRow({ session }: { session: Session }) {
 
   async function saveMeta() {
     setSavingMeta(true)
-    const updated: Session = {
-      ...session,
-      type,
-      trainingType: type === 'training' ? trainingType : undefined,
-      matchResult: type === 'match' ? matchResult : undefined,
-      matchLocation: type === 'match' ? matchLocation : undefined,
+    setMetaError(null)
+    try {
+      const updated: Session = {
+        ...session,
+        type,
+        trainingType: type === 'training' ? trainingType : undefined,
+        matchResult: type === 'match' ? matchResult : undefined,
+        matchLocation: type === 'match' ? matchLocation : undefined,
+      }
+      await putSession(updated)
+      invalidateMetadata()
+      setPanel('none')
+    } catch (err) {
+      setMetaError(err instanceof Error ? err.message : 'Errore imprevisto durante il salvataggio.')
+    } finally {
+      setSavingMeta(false)
     }
-    await putSession(updated)
-    invalidateMetadata()
-    setSavingMeta(false)
-    setPanel('none')
   }
 
   async function saveRpe() {
     setSavingRpe(true)
-    const entries = buildRpeEntries(session.id, segments, rpeDraft)
-    if (entries.length > 0) await putRpeEntries(entries)
-    invalidateRpe(session.id)
-    setSavingRpe(false)
-    setPanel('none')
+    setRpeError(null)
+    try {
+      const entries = buildRpeEntries(session.id, segments, rpeDraft)
+      if (entries.length > 0) await putRpeEntries(entries)
+      invalidateRpe(session.id)
+      setPanel('none')
+    } catch (err) {
+      setRpeError(err instanceof Error ? err.message : 'Errore imprevisto durante il salvataggio.')
+    } finally {
+      setSavingRpe(false)
+    }
   }
 
   async function handleDelete() {
@@ -103,8 +118,14 @@ function SessionRow({ session }: { session: Session }) {
     )
     if (!confirmed) return
     setDeleting(true)
-    await deleteSession(session.id)
-    invalidateAfterDelete()
+    setDeleteError(null)
+    try {
+      await deleteSession(session.id)
+      invalidateAfterDelete()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Errore imprevisto durante l\'eliminazione.')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -162,6 +183,14 @@ function SessionRow({ session }: { session: Session }) {
           </div>
         </td>
       </tr>
+
+      {deleteError && (
+        <tr className="border-b border-border bg-status-critical/5">
+          <td colSpan={7} className="px-4 py-2 text-xs text-status-critical">
+            Eliminazione non riuscita: {deleteError}
+          </td>
+        </tr>
+      )}
 
       {panel === 'edit' && (
         <tr className="border-b border-border bg-page/40">
@@ -226,6 +255,7 @@ function SessionRow({ session }: { session: Session }) {
                   </label>
                 </>
               )}
+              {metaError && <p className="w-full text-xs text-status-critical">Salvataggio non riuscito: {metaError}</p>}
               <div className="ml-auto flex gap-2">
                 <button
                   type="button"
@@ -240,7 +270,7 @@ function SessionRow({ session }: { session: Session }) {
                   disabled={savingMeta}
                   className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
                 >
-                  {savingMeta ? 'Salvataggio…' : 'Salva'}
+                  {savingMeta ? 'Salvataggio…' : metaError ? 'Riprova' : 'Salva'}
                 </button>
               </div>
             </div>
@@ -270,6 +300,7 @@ function SessionRow({ session }: { session: Session }) {
                     </label>
                   ))}
                 </div>
+                {rpeError && <p className="mt-2 text-xs text-status-critical">Salvataggio non riuscito: {rpeError}</p>}
                 <div className="mt-3 flex justify-end gap-2">
                   <button
                     type="button"
@@ -284,7 +315,7 @@ function SessionRow({ session }: { session: Session }) {
                     disabled={savingRpe}
                     className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
                   >
-                    {savingRpe ? 'Salvataggio…' : 'Salva RPE'}
+                    {savingRpe ? 'Salvataggio…' : rpeError ? 'Riprova' : 'Salva RPE'}
                   </button>
                 </div>
               </>

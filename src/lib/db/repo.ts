@@ -1,15 +1,30 @@
 import type { AppSettings, DrillSegment, Player, RpeEntry, Session } from '../../types/domain'
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
-  })
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status} ${body}`)
+const DEFAULT_TIMEOUT_MS = 25000
+
+/** Every API call gets a hard ceiling — a stuck fetch (dead connection, a Worker/D1 call that never resolves) must surface as an error, never hang the caller's "saving" state forever. */
+async function apiFetch<T>(path: string, init?: RequestInit, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(path, {
+      ...init,
+      headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status} ${body}`)
+    }
+    return (await res.json()) as T
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(`${init?.method ?? 'GET'} ${path} non ha risposto entro ${timeoutMs / 1000}s — riprova.`)
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
-  return res.json() as Promise<T>
 }
 
 // ---------- sessions ----------
@@ -45,23 +60,9 @@ export async function putPlayer(player: Player): Promise<void> {
   })
 }
 
-/** Patches several players in one request — see putPlayer for the per-player shape. */
-export async function putPlayers(
-  patches: { id: string; position?: Player['position']; active?: boolean; personalMaxSpeedKmh?: number; pbConfirmed?: boolean }[],
-): Promise<void> {
-  if (patches.length === 0) return
-  await apiFetch('/api/players/bulk', { method: 'PATCH', body: JSON.stringify(patches) })
-}
-
 /** Find-or-create a player by display name, returning the (possibly new) player. */
 export async function upsertPlayerByName(displayName: string): Promise<Player> {
   return apiFetch<Player>('/api/players/upsert', { method: 'POST', body: JSON.stringify({ displayName }) })
-}
-
-/** Find-or-create several players by display name in one request — see upsertPlayerByName. */
-export async function upsertPlayersByNames(displayNames: string[]): Promise<Player[]> {
-  if (displayNames.length === 0) return []
-  return apiFetch<Player[]>('/api/players/upsert-bulk', { method: 'POST', body: JSON.stringify({ displayNames }) })
 }
 
 // ---------- segments ----------
