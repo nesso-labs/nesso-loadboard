@@ -5,6 +5,7 @@ import { ComparePage } from './pages/ComparePage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { DrillsPage } from './pages/DrillsPage'
 import { DynamicLoadPage } from './pages/DynamicLoadPage'
+import { GameVGamePage } from './pages/GameVGamePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
 import { OverviewPage } from './pages/OverviewPage'
 import { PlayerProfilePage } from './pages/PlayerProfilePage'
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/dynamic-load" element={<DynamicLoadPage />} />
         <Route path="/session-v-game" element={<SessionVGamePage />} />
         <Route path="/session-v-session" element={<SessionVSessionPage />} />
+        <Route path="/game-v-game" element={<GameVGamePage />} />
         <Route path="/weekly-running" element={<WeeklyRunningPage />} />
         <Route path="/drills" element={<DrillsPage />} />
         <Route path="/compare" element={<ComparePage />} />
