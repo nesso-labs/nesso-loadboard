@@ -5,8 +5,10 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, mechanicalWorkPerMin } from '../lib/metrics/metricsCatalog'
 import { mean } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment } from '../types/domain'
+
+const TEAM_OPTION = '__team__'
 
 interface MetricSpec {
   key: string
@@ -25,8 +27,12 @@ export function SessionVGamePage() {
   const { currentSession } = useCurrentSession()
   const { data: sessions = [] } = useSessionsQuery()
   const { data: segments = [], isLoading } = useAllSegmentsQuery()
+  const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
   const [selectedTrainingId, setSelectedTrainingId] = useState<string | undefined>(undefined)
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined)
+
+  const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
 
   const trainingSessions = useMemo(
     () => sessions.filter((s) => s.type === 'training').sort((a, b) => b.date.localeCompare(a.date)),
@@ -64,10 +70,24 @@ export function SessionVGamePage() {
 
   if (!activeTraining) return null
 
-  const trainingSessionSegs = segments.filter((s) => s.sessionId === activeTraining.id)
-  const trainingFullSegs = trainingSessionSegs.filter((s) => s.segmentKind === 'full_session')
-  const otherDrillTitles = [...new Set(trainingSessionSegs.map((s) => s.drillTitle))]
+  const trainingSessionSegsAll = segments.filter((s) => s.sessionId === activeTraining.id)
+  const trainingFullSegsAll = trainingSessionSegsAll.filter((s) => s.segmentKind === 'full_session')
   const matchCount = matchSessionIds.size
+
+  const playerOptions = [...new Set(trainingFullSegsAll.map((s) => s.playerId))].sort((a, b) =>
+    (playerById.get(a)?.displayName ?? a).localeCompare(playerById.get(b)?.displayName ?? b),
+  )
+  const activePlayerId = selectedPlayerId && playerOptions.includes(selectedPlayerId) ? selectedPlayerId : undefined
+  const activePlayer = activePlayerId ? playerById.get(activePlayerId) : undefined
+
+  const trainingSessionSegs = activePlayerId
+    ? trainingSessionSegsAll.filter((s) => s.playerId === activePlayerId)
+    : trainingSessionSegsAll
+  const trainingFullSegs = activePlayerId
+    ? trainingFullSegsAll.filter((s) => s.playerId === activePlayerId)
+    : trainingFullSegsAll
+  const playerGameSegs = activePlayerId ? gameSegs.filter((s) => s.playerId === activePlayerId) : gameSegs
+  const otherDrillTitles = [...new Set(trainingSessionSegs.map((s) => s.drillTitle))]
 
   const mechWorkSpec: MetricSpec = {
     key: 'mechw',
@@ -80,20 +100,37 @@ export function SessionVGamePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ink-secondary">Allenamento</span>
-          <select
-            value={activeTraining.id}
-            onChange={(e) => setSelectedTrainingId(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
-          >
-            {trainingSessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.date} — {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-ink-secondary">Allenamento</span>
+            <select
+              value={activeTraining.id}
+              onChange={(e) => setSelectedTrainingId(e.target.value)}
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+            >
+              {trainingSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.date} — {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-ink-secondary">Giocatore</span>
+            <select
+              value={activePlayerId ?? TEAM_OPTION}
+              onChange={(e) => setSelectedPlayerId(e.target.value === TEAM_OPTION ? undefined : e.target.value)}
+              className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+            >
+              <option value={TEAM_OPTION}>Tutta la squadra (media)</option>
+              {playerOptions.map((id) => (
+                <option key={id} value={id}>
+                  {playerById.get(id)?.displayName ?? id}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <p className="text-sm text-ink-secondary">
           Tipo di allenamento:{' '}
           <span className="font-medium text-ink">
@@ -103,15 +140,35 @@ export function SessionVGamePage() {
       </div>
 
       <p className="text-sm text-ink-secondary">
-        Allenamento selezionato confrontato con la media di {matchCount} {matchCount === 1 ? 'partita' : 'partite'} —
-        media per giocatore.
+        {activePlayer ? (
+          <>
+            Allenamento di <span className="font-medium text-ink">{activePlayer.displayName}</span> confrontato con
+            la sua media personale su {playerGameSegs.length} {playerGameSegs.length === 1 ? 'partita' : 'partite'}{' '}
+            disputate.
+          </>
+        ) : (
+          <>
+            Allenamento selezionato confrontato con la media di {matchCount} {matchCount === 1 ? 'partita' : 'partite'}{' '}
+            — media per giocatore.
+          </>
+        )}
       </p>
 
       {trainingFullSegs.length === 0 ? (
         <EmptyState
           icon={Swords}
           title="Nessun dato di sessione completa"
-          description="Serve almeno una riga 'Full Session' in questo allenamento per confrontare volume e intensità con la media delle gare."
+          description={
+            activePlayer
+              ? `${activePlayer.displayName} non ha una riga 'Full Session' in questo allenamento.`
+              : "Serve almeno una riga 'Full Session' in questo allenamento per confrontare volume e intensità con la media delle gare."
+          }
+        />
+      ) : activePlayer && playerGameSegs.length === 0 ? (
+        <EmptyState
+          icon={Swords}
+          title="Nessun dato di gara per questo giocatore"
+          description={`${activePlayer.displayName} non risulta in nessuna sessione di tipo Partita con una riga 'Full Session'.`}
         />
       ) : (
         <>
@@ -127,7 +184,7 @@ export function SessionVGamePage() {
                 primaryLabel="Allenamento"
                 primaryValue={mean(trainingFullSegs.map(m.volume))}
                 referenceLabel="Gara"
-                referenceValue={mean(gameSegs.map(m.volume))}
+                referenceValue={mean(playerGameSegs.map(m.volume))}
               />
             ))}
           </div>
@@ -146,7 +203,7 @@ export function SessionVGamePage() {
                   primaryLabel="Allenamento"
                   primaryValue={mean(trainingFullSegs.map(perMin))}
                   referenceLabel="Gara"
-                  referenceValue={mean(gameSegs.map(perMin))}
+                  referenceValue={mean(playerGameSegs.map(perMin))}
                   format={(v) => v.toFixed(1)}
                 />
               )
@@ -157,13 +214,15 @@ export function SessionVGamePage() {
               primaryLabel="Allenamento"
               primaryValue={mean(trainingFullSegs.map((s) => mechanicalWorkPerMin(s, settings)))}
               referenceLabel="Gara"
-              referenceValue={mean(gameSegs.map((s) => mechanicalWorkPerMin(s, settings)))}
+              referenceValue={mean(playerGameSegs.map((s) => mechanicalWorkPerMin(s, settings)))}
               format={(v) => v.toFixed(2)}
             />
           </div>
 
           <div>
-            <p className="mb-3 text-sm font-semibold text-ink">Riepilogo per drill (media squadra) — {activeTraining.label}</p>
+            <p className="mb-3 text-sm font-semibold text-ink">
+              Riepilogo per drill ({activePlayer ? activePlayer.displayName : 'media squadra'}) — {activeTraining.label}
+            </p>
             <div className="overflow-x-auto panel">
               <table className="w-full text-sm">
                 <thead>
@@ -186,7 +245,7 @@ export function SessionVGamePage() {
                       <tr key={title} className="border-b border-border last:border-0">
                         <td className="px-4 py-2 font-medium text-ink">
                           {title}
-                          <span className="ml-2 text-xs text-ink-muted">({rows.length} giocatori)</span>
+                          {!activePlayer && <span className="ml-2 text-xs text-ink-muted">({rows.length} giocatori)</span>}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums text-ink">{durationMin.toFixed(0)}</td>
                         <td className="px-3 py-2 text-right tabular-nums text-ink">{td.toFixed(0)}</td>
