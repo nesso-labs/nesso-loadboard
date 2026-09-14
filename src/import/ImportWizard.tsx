@@ -51,6 +51,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [players, setPlayers] = useState<Player[]>([])
   const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const invalidate = useInvalidateAfterImport()
   const { setCurrentSessionId } = useCurrentSession()
@@ -86,7 +87,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
         setFileError(err.message)
         setStep('select')
       } else {
-        throw err
+        setFileError(err instanceof Error ? err.message : 'Errore imprevisto durante la lettura del CSV.')
+        setStep('select')
       }
     }
   }
@@ -94,11 +96,17 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   async function handleFinish() {
     if (!staged) return
     setSaving(true)
-    const session = await commitImport(staged, rpeByPlayerId)
-    invalidate()
-    setCurrentSessionId(session.id)
-    setSaving(false)
-    setStep('done')
+    setSaveError(null)
+    try {
+      const session = await commitImport(staged, rpeByPlayerId)
+      invalidate()
+      setCurrentSessionId(session.id)
+      setStep('done')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Errore imprevisto durante il salvataggio.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -257,6 +265,16 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
             </div>
           </div>
 
+          {saveError && (
+            <div className="flex items-start gap-2 rounded-md border border-status-critical/40 bg-status-critical/10 p-3 text-sm text-status-critical">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <div>
+                <p className="font-medium">Salvataggio non riuscito</p>
+                <p className="text-xs">{saveError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between">
             <button
               type="button"
@@ -271,7 +289,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
               onClick={handleFinish}
               className="flex items-center gap-1 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
             >
-              {saving ? 'Salvataggio…' : 'Salva sessione'} <Check className="size-4" />
+              {saving ? 'Salvataggio…' : saveError ? 'Riprova' : 'Salva sessione'} <Check className="size-4" />
             </button>
           </div>
         </div>
