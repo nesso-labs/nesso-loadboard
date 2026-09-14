@@ -44,19 +44,9 @@ export function rowToSession(r: Record<string, unknown>): Session {
 
 // --- players ---
 
+/** Used only for the new-player INSERT — height/weight are never set at creation time, so they're deliberately left out of the fixed column list (see the PATCH endpoint for how those two get written once set). */
 export function playerToRow(p: Player): unknown[] {
-  return [
-    p.id,
-    p.displayName,
-    p.position,
-    p.heightCm ?? null,
-    p.weightKg ?? null,
-    p.personalMaxSpeedKmh ?? null,
-    p.pbConfirmed ? 1 : 0,
-    p.active ? 1 : 0,
-    p.createdAt,
-    p.updatedAt,
-  ]
+  return [p.id, p.displayName, p.position, p.personalMaxSpeedKmh ?? null, p.pbConfirmed ? 1 : 0, p.active ? 1 : 0, p.createdAt, p.updatedAt]
 }
 
 export function rowToPlayer(r: Record<string, unknown>): Player {
