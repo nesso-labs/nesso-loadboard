@@ -8,7 +8,7 @@ interface ComparisonBarProps {
   format?: (value: number) => string
 }
 
-/** Two horizontal bars (this session vs a reference) sharing one scale. */
+/** Two horizontal bars (this session vs a reference) sharing one scale — one hue each, so the pair reads at a glance without relying on the text labels alone. */
 export function ComparisonBar({
   label,
   unit,
@@ -26,8 +26,8 @@ export function ComparisonBar({
         {label}
         {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
       </p>
-      <Bar label={primaryLabel} value={primaryValue} max={max} format={format} accent />
-      <Bar label={referenceLabel} value={referenceValue} max={max} format={format} />
+      <Bar label={primaryLabel} value={primaryValue} max={max} format={format} color="var(--color-series-blue)" />
+      <Bar label={referenceLabel} value={referenceValue} max={max} format={format} color="var(--color-series-yellow)" />
     </div>
   )
 }
@@ -37,23 +37,20 @@ function Bar({
   value,
   max,
   format,
-  accent,
+  color,
 }: {
   label: string
   value: number
   max: number
   format: (v: number) => string
-  accent?: boolean
+  color: string
 }) {
   const pct = Math.min(100, (value / max) * 100)
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-16 shrink-0 truncate text-ink-secondary">{label}</span>
       <div className="h-4 flex-1 rounded bg-ink/5">
-        <div
-          className={`h-4 rounded ${accent ? 'bg-accent' : 'bg-ink-muted'}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-4 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
       <span className="w-14 shrink-0 text-right font-semibold tabular-nums text-ink">{format(value)}</span>
     </div>
