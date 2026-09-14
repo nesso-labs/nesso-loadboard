@@ -1,5 +1,5 @@
 import type { DrillSegment, RawCsvRow, SegmentKind, SessionType } from '../../types/domain'
-import { upsertPlayerByName } from '../db/repo'
+import { upsertPlayersByNames } from '../db/repo'
 import { slugify } from '../utils'
 
 export function classifySegmentKind(drillTitle: string): SegmentKind {
@@ -42,7 +42,7 @@ export async function buildSegmentsForSession(
   }
 
   const playerNames = [...new Set(rows.map((r) => r.playerDisplayName))]
-  const players = await Promise.all(playerNames.map((name) => upsertPlayerByName(name)))
+  const players = await upsertPlayersByNames(playerNames)
   const playerIdByName = new Map(players.map((p) => [p.displayName, p.id]))
   const displayNameByPlayerId = new Map(players.map((p) => [p.id, p.displayName]))
 
