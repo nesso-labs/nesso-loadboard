@@ -1,9 +1,40 @@
-import type { MatchLocation, MatchResult, Player, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
+import type { DrillSegment, MatchLocation, MatchResult, Player, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
 import { listPlayers, putPlayer, putRpeEntries, putSegments, putSession } from '../db/repo'
 import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
 import { reconcileRows } from './reconcile'
 import { buildSegmentsForSession } from './segmentBuilder'
+
+/** RPE entries from a {playerId: rpe} map — sRPE uses the player's full_session duration when present, else the sum of all their segments in this session. Entries with rpe <= 0 are dropped (never fabricate a zero-effort entry). */
+export function buildRpeEntries(
+  sessionId: string,
+  segments: DrillSegment[],
+  rpeByPlayerId: Record<string, number>,
+): RpeEntry[] {
+  const now = new Date().toISOString()
+  const fullSessionDurationByPlayer = new Map<string, number>()
+  for (const seg of segments) {
+    if (seg.segmentKind === 'full_session') {
+      fullSessionDurationByPlayer.set(seg.playerId, seg.durationSec)
+    }
+  }
+
+  return Object.entries(rpeByPlayerId)
+    .filter(([, rpe]) => rpe > 0)
+    .map(([playerId, rpe]) => {
+      const durationSec =
+        fullSessionDurationByPlayer.get(playerId) ??
+        segments.filter((s) => s.playerId === playerId).reduce((sum, s) => sum + s.durationSec, 0)
+      return {
+        id: `${sessionId}:${playerId}`,
+        sessionId,
+        playerId,
+        rpe,
+        sRpe: rpe * (durationSec / 60),
+        enteredAt: now,
+      }
+    })
+}
 
 export interface SessionMetadataInput {
   date: string
@@ -65,29 +96,7 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
   await putSession(session)
   await putSegments(staged.segments)
 
-  const fullSessionDurationByPlayer = new Map<string, number>()
-  for (const seg of staged.segments) {
-    if (seg.segmentKind === 'full_session') {
-      fullSessionDurationByPlayer.set(seg.playerId, seg.durationSec)
-    }
-  }
-
-  const rpeEntries: RpeEntry[] = Object.entries(rpeByPlayerId)
-    .filter(([, rpe]) => rpe > 0)
-    .map(([playerId, rpe]) => {
-      const durationSec =
-        fullSessionDurationByPlayer.get(playerId) ??
-        staged.segments.filter((s) => s.playerId === playerId).reduce((sum, s) => sum + s.durationSec, 0)
-      return {
-        id: `${session.id}:${playerId}`,
-        sessionId: session.id,
-        playerId,
-        rpe,
-        sRpe: rpe * (durationSec / 60),
-        enteredAt: now,
-      }
-    })
-
+  const rpeEntries = buildRpeEntries(session.id, staged.segments, rpeByPlayerId)
   if (rpeEntries.length > 0) {
     await putRpeEntries(rpeEntries)
   }

@@ -26,8 +26,22 @@ export function ComparisonBar({
         {label}
         {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
       </p>
-      <Bar label={primaryLabel} value={primaryValue} max={max} format={format} color="var(--color-series-blue)" />
-      <Bar label={referenceLabel} value={referenceValue} max={max} format={format} color="var(--color-series-yellow)" />
+      <Bar
+        label={primaryLabel}
+        value={primaryValue}
+        max={max}
+        format={format}
+        color="var(--color-series-blue)"
+        glowClass="glow-blue"
+      />
+      <Bar
+        label={referenceLabel}
+        value={referenceValue}
+        max={max}
+        format={format}
+        color="var(--color-series-yellow)"
+        glowClass="glow-accent"
+      />
     </div>
   )
 }
@@ -38,21 +52,26 @@ function Bar({
   max,
   format,
   color,
+  glowClass,
 }: {
   label: string
   value: number
   max: number
   format: (v: number) => string
   color: string
+  glowClass: string
 }) {
   const pct = Math.min(100, (value / max) * 100)
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-16 shrink-0 truncate text-ink-secondary">{label}</span>
-      <div className="h-4 flex-1 rounded bg-ink/5">
-        <div className="h-4 rounded" style={{ width: `${pct}%`, backgroundColor: color }} />
+      <div className="h-4 flex-1 rounded-full bg-ink/5">
+        <div
+          className={`h-4 rounded-full ${glowClass}`}
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
-      <span className="w-14 shrink-0 text-right font-semibold tabular-nums text-ink">{format(value)}</span>
+      <span className="w-14 shrink-0 text-right font-bold tabular-nums text-ink">{format(value)}</span>
     </div>
   )
 }

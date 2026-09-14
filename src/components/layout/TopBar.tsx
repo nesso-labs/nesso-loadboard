@@ -77,7 +77,7 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
         <Link
           to="/sessions"
           aria-label="Importa sessione"
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-2 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 sm:px-3"
+          className="glow-accent flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-accent-ink transition-opacity hover:opacity-90 sm:px-3"
         >
           <Upload className="size-3.5" />
           <span className="hidden sm:inline">Importa sessione</span>

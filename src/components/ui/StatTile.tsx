@@ -12,18 +12,21 @@ interface StatTileProps {
 
 export function StatTile({ label, value, unit, hint, accent, icon }: StatTileProps) {
   return (
-    <div className={cn('flex flex-col gap-1.5 p-4', accent ? 'panel-accent' : 'panel')}>
+    <div className={cn('flex flex-col gap-2 p-5', accent ? 'panel-accent glow-accent' : 'panel')}>
       <div className="flex items-center justify-between text-sm text-ink-secondary">
         <span>{label}</span>
         {icon}
       </div>
       <div className="flex items-baseline gap-1.5">
         <span
-          className={cn('font-display text-3xl font-semibold tabular-nums leading-none text-ink', accent && 'text-accent')}
+          className={cn(
+            'font-display text-4xl font-bold tabular-nums leading-none text-ink',
+            accent && 'text-accent text-glow-accent',
+          )}
         >
           {value}
         </span>
-        {unit && <span className="text-sm text-ink-secondary">{unit}</span>}
+        {unit && <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{unit}</span>}
       </div>
       {hint && <p className="text-xs text-ink-muted">{hint}</p>}
     </div>

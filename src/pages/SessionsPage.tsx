@@ -1,38 +1,294 @@
-import { Upload } from 'lucide-react'
+import { Gauge, Pencil, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImportWizard } from '../import/ImportWizard'
 import { EmptyState } from '../components/ui/EmptyState'
-import { MATCH_LOCATION_LABEL, MATCH_RESULT_LABEL, type Session } from '../types/domain'
-import { useRpeBySessionQuery, useSessionsQuery } from '../state/queries'
+import { buildRpeEntries } from '../lib/csv/importSession'
+import { deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
+import {
+  useInvalidateAfterImport,
+  usePlayersQuery,
+  useRpeBySessionQuery,
+  useSegmentsBySessionQuery,
+  useSessionsQuery,
+} from '../state/queries'
+import {
+  MATCH_LOCATION_LABEL,
+  MATCH_RESULT_LABEL,
+  TRAINING_TYPE_LABEL,
+  type MatchLocation,
+  type MatchResult,
+  type Session,
+  type SessionType,
+  type TrainingType,
+} from '../types/domain'
+
+const TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico_alte_velocita', 'rifinitura', 'recupero_attivo', 'mix']
+const MATCH_RESULTS: MatchResult[] = ['win', 'draw', 'loss']
+const MATCH_LOCATIONS: MatchLocation[] = ['home', 'away', 'away_2d']
+
+type Panel = 'none' | 'edit' | 'rpe'
 
 function SessionRow({ session }: { session: Session }) {
   const { data: rpe = [] } = useRpeBySessionQuery(session.id)
+  const { data: players = [] } = usePlayersQuery()
+  const invalidate = useInvalidateAfterImport()
+
+  const [panel, setPanel] = useState<Panel>('none')
+  const [deleting, setDeleting] = useState(false)
+
+  const [type, setType] = useState<SessionType>(session.type)
+  const [trainingType, setTrainingType] = useState<TrainingType>(session.trainingType ?? 'mix')
+  const [matchResult, setMatchResult] = useState<MatchResult>(session.matchResult ?? 'win')
+  const [matchLocation, setMatchLocation] = useState<MatchLocation>(session.matchLocation ?? 'home')
+  const [savingMeta, setSavingMeta] = useState(false)
+
+  const { data: segments = [] } = useSegmentsBySessionQuery(panel === 'rpe' ? session.id : undefined)
+  const [rpeDraft, setRpeDraft] = useState<Record<string, number>>({})
+  const [savingRpe, setSavingRpe] = useState(false)
+
+  const playerById = new Map(players.map((p) => [p.id, p]))
+  const involvedPlayerIds = [...new Set(segments.map((s) => s.playerId))].sort((a, b) =>
+    (playerById.get(a)?.displayName ?? a).localeCompare(playerById.get(b)?.displayName ?? b),
+  )
+
+  function toggleEdit() {
+    if (panel !== 'edit') {
+      setType(session.type)
+      setTrainingType(session.trainingType ?? 'mix')
+      setMatchResult(session.matchResult ?? 'win')
+      setMatchLocation(session.matchLocation ?? 'home')
+    }
+    setPanel(panel === 'edit' ? 'none' : 'edit')
+  }
+
+  function toggleRpe() {
+    if (panel !== 'rpe') {
+      setRpeDraft(Object.fromEntries(rpe.map((r) => [r.playerId, r.rpe])))
+    }
+    setPanel(panel === 'rpe' ? 'none' : 'rpe')
+  }
+
+  async function saveMeta() {
+    setSavingMeta(true)
+    const updated: Session = {
+      ...session,
+      type,
+      trainingType: type === 'training' ? trainingType : undefined,
+      matchResult: type === 'match' ? matchResult : undefined,
+      matchLocation: type === 'match' ? matchLocation : undefined,
+    }
+    await putSession(updated)
+    invalidate()
+    setSavingMeta(false)
+    setPanel('none')
+  }
+
+  async function saveRpe() {
+    setSavingRpe(true)
+    const entries = buildRpeEntries(session.id, segments, rpeDraft)
+    if (entries.length > 0) await putRpeEntries(entries)
+    invalidate()
+    setSavingRpe(false)
+    setPanel('none')
+  }
+
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      `Eliminare definitivamente la sessione "${session.label}" (${session.date})? Verranno rimossi anche tutti i dati e l'RPE associati. L'operazione non è reversibile.`,
+    )
+    if (!confirmed) return
+    setDeleting(true)
+    await deleteSession(session.id)
+    invalidate()
+  }
+
   return (
-    <tr className="border-b border-border last:border-0">
-      <td className="px-4 py-2 tabular-nums text-ink">{session.date}</td>
-      <td className="px-4 py-2 font-medium text-ink">{session.label}</td>
-      <td className="px-4 py-2 text-ink-secondary">
-        {session.type === 'match' ? 'Partita' : 'Allenamento'}
-        {session.type === 'match' && session.matchResult && (
-          <span className="ml-1.5 text-xs text-ink-muted">
-            ({MATCH_RESULT_LABEL[session.matchResult]}
-            {session.matchLocation && ` — ${MATCH_LOCATION_LABEL[session.matchLocation]}`})
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-2 tabular-nums text-ink-secondary">{session.rawRowCount}</td>
-      <td className="px-4 py-2">
-        {session.warningCount > 0 ? (
-          <span className="rounded-full bg-status-warning/15 px-2 py-0.5 text-xs font-medium text-status-warning">
-            {session.warningCount} avvisi
-          </span>
-        ) : (
-          <span className="rounded-full bg-status-good/15 px-2 py-0.5 text-xs font-medium text-status-good">OK</span>
-        )}
-      </td>
-      <td className="px-4 py-2 text-xs text-ink-muted">{rpe.length > 0 ? `RPE: ${rpe.length}` : 'RPE mancante'}</td>
-    </tr>
+    <>
+      <tr className="border-b border-border last:border-0">
+        <td className="px-4 py-2 tabular-nums text-ink">{session.date}</td>
+        <td className="px-4 py-2 font-medium text-ink">{session.label}</td>
+        <td className="px-4 py-2 text-ink-secondary">
+          {session.type === 'match' ? 'Partita' : 'Allenamento'}
+          {session.type === 'training' && session.trainingType && (
+            <span className="ml-1.5 text-xs text-ink-muted">({TRAINING_TYPE_LABEL[session.trainingType]})</span>
+          )}
+          {session.type === 'match' && session.matchResult && (
+            <span className="ml-1.5 text-xs text-ink-muted">
+              ({MATCH_RESULT_LABEL[session.matchResult]}
+              {session.matchLocation && ` — ${MATCH_LOCATION_LABEL[session.matchLocation]}`})
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-2 tabular-nums text-ink-secondary">{session.rawRowCount}</td>
+        <td className="px-4 py-2">
+          {session.warningCount > 0 ? (
+            <span className="rounded-full bg-status-warning/15 px-2 py-0.5 text-xs font-medium text-status-warning">
+              {session.warningCount} avvisi
+            </span>
+          ) : (
+            <span className="rounded-full bg-status-good/15 px-2 py-0.5 text-xs font-medium text-status-good">OK</span>
+          )}
+        </td>
+        <td className="px-4 py-2 text-xs text-ink-muted">{rpe.length > 0 ? `RPE: ${rpe.length}` : 'RPE mancante'}</td>
+        <td className="px-4 py-2">
+          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={toggleEdit}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
+            >
+              <Pencil className="size-3.5" /> Tipo
+            </button>
+            <button
+              type="button"
+              onClick={toggleRpe}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
+            >
+              <Gauge className="size-3.5" /> RPE
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10 disabled:opacity-60"
+            >
+              <Trash2 className="size-3.5" /> {deleting ? 'Eliminazione…' : 'Elimina'}
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {panel === 'edit' && (
+        <tr className="border-b border-border bg-page/40">
+          <td colSpan={7} className="px-4 py-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium text-ink-secondary">Tipo</span>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value as SessionType)}
+                  className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                >
+                  <option value="training">Allenamento</option>
+                  <option value="match">Partita</option>
+                </select>
+              </label>
+              {type === 'training' && (
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="font-medium text-ink-secondary">Tipologia allenamento</span>
+                  <select
+                    value={trainingType}
+                    onChange={(e) => setTrainingType(e.target.value as TrainingType)}
+                    className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                  >
+                    {TRAINING_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {TRAINING_TYPE_LABEL[t]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {type === 'match' && (
+                <>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium text-ink-secondary">Esito</span>
+                    <select
+                      value={matchResult}
+                      onChange={(e) => setMatchResult(e.target.value as MatchResult)}
+                      className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                    >
+                      {MATCH_RESULTS.map((r) => (
+                        <option key={r} value={r}>
+                          {MATCH_RESULT_LABEL[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium text-ink-secondary">Sede</span>
+                    <select
+                      value={matchLocation}
+                      onChange={(e) => setMatchLocation(e.target.value as MatchLocation)}
+                      className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                    >
+                      {MATCH_LOCATIONS.map((l) => (
+                        <option key={l} value={l}>
+                          {MATCH_LOCATION_LABEL[l]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+              <div className="ml-auto flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPanel('none')}
+                  className="rounded-md px-3 py-1.5 text-xs text-ink-secondary hover:bg-ink/5"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={saveMeta}
+                  disabled={savingMeta}
+                  className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+                >
+                  {savingMeta ? 'Salvataggio…' : 'Salva'}
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {panel === 'rpe' && (
+        <tr className="border-b border-border bg-page/40">
+          <td colSpan={7} className="px-4 py-3">
+            {involvedPlayerIds.length === 0 ? (
+              <p className="text-xs text-ink-muted">Caricamento giocatori…</p>
+            ) : (
+              <>
+                <div className="grid max-h-64 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                  {involvedPlayerIds.map((id) => (
+                    <label key={id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate text-ink">{playerById.get(id)?.displayName ?? id}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={rpeDraft[id] ?? ''}
+                        onChange={(e) => setRpeDraft((prev) => ({ ...prev, [id]: Number(e.target.value) }))}
+                        className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right tabular-nums text-ink"
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPanel('none')}
+                    className="rounded-md px-3 py-1.5 text-xs text-ink-secondary hover:bg-ink/5"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveRpe}
+                    disabled={savingRpe}
+                    className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+                  >
+                    {savingRpe ? 'Salvataggio…' : 'Salva RPE'}
+                  </button>
+                </div>
+              </>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
@@ -55,7 +311,10 @@ export function SessionsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-ink-secondary">Storico delle sessioni importate in questo browser.</p>
+        <p className="text-sm text-ink-secondary">
+          Storico delle sessioni importate in questo browser. Da qui puoi anche cambiarne la tipologia, correggere
+          l'RPE o eliminarle.
+        </p>
         <button
           type="button"
           onClick={() => setImporting(true)}
@@ -82,6 +341,7 @@ export function SessionsPage() {
                 <th className="px-4 py-2">Righe</th>
                 <th className="px-4 py-2">Import</th>
                 <th className="px-4 py-2">RPE</th>
+                <th className="px-4 py-2 text-right">Azioni</th>
               </tr>
             </thead>
             <tbody>

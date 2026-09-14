@@ -65,11 +65,13 @@ export function useSettingsQuery() {
   return useQuery({ queryKey: queryKeys.settings, queryFn: getSettings })
 }
 
+/** Invalidates everything a session import/edit/delete/RPE change can affect. */
 export function useInvalidateAfterImport() {
   const queryClient = useQueryClient()
   return () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.sessions })
     queryClient.invalidateQueries({ queryKey: queryKeys.players })
-    queryClient.invalidateQueries({ queryKey: queryKeys.allSegments })
+    queryClient.invalidateQueries({ queryKey: ['segments'] })
+    queryClient.invalidateQueries({ queryKey: ['rpe'] })
   }
 }

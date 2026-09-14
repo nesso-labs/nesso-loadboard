@@ -27,14 +27,16 @@ export function MetricTrendPanel({ title, unit, points, rolling, latestValue, fo
   const data = points.map((p, i) => ({ ...p, rolling: rolling[i] }))
 
   return (
-    <div className="panel p-4">
-      <div className="mb-2 flex items-baseline justify-between">
+    <div className="panel p-5">
+      <div className="mb-3 flex items-baseline justify-between">
         <p className="text-sm font-medium text-ink-secondary">
           {title}
-          {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
+          {unit && <span className="ml-1 text-xs uppercase tracking-wide text-ink-muted">({unit})</span>}
         </p>
         {latestValue !== undefined && (
-          <span className="font-display text-lg font-semibold tabular-nums text-ink">{format(latestValue)}</span>
+          <span className="font-display text-glow-accent text-xl font-bold tabular-nums text-ink">
+            {format(latestValue)}
+          </span>
         )}
       </div>
       <ResponsiveContainer width="100%" height={120}>
@@ -44,9 +46,14 @@ export function MetricTrendPanel({ title, unit, points, rolling, latestValue, fo
           <YAxis tick={{ fontSize: 10, fill: 'var(--color-ink-muted)' }} axisLine={false} tickLine={false} width={36} />
           <Tooltip
             formatter={(value, name) => [format(Number(value)), name === 'rolling' ? 'Media mobile' : 'Sessione']}
-            contentStyle={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, fontSize: 12 }}
+            contentStyle={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 10,
+              fontSize: 12,
+            }}
           />
-          <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {data.map((point, i) => (
               <Cell key={i} fill="var(--color-series-blue)" fillOpacity={point.type === 'match' ? 1 : 0.35} />
             ))}
