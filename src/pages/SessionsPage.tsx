@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ImportWizard } from '../import/ImportWizard'
 import { EmptyState } from '../components/ui/EmptyState'
-import type { Session } from '../types/domain'
+import { MATCH_LOCATION_LABEL, MATCH_RESULT_LABEL, type Session } from '../types/domain'
 import { useRpeBySessionQuery, useSessionsQuery } from '../state/queries'
 
 function SessionRow({ session }: { session: Session }) {
@@ -12,7 +12,15 @@ function SessionRow({ session }: { session: Session }) {
     <tr className="border-b border-border last:border-0">
       <td className="px-4 py-2 tabular-nums text-ink">{session.date}</td>
       <td className="px-4 py-2 font-medium text-ink">{session.label}</td>
-      <td className="px-4 py-2 text-ink-secondary">{session.type === 'match' ? 'Partita' : 'Allenamento'}</td>
+      <td className="px-4 py-2 text-ink-secondary">
+        {session.type === 'match' ? 'Partita' : 'Allenamento'}
+        {session.type === 'match' && session.matchResult && (
+          <span className="ml-1.5 text-xs text-ink-muted">
+            ({MATCH_RESULT_LABEL[session.matchResult]}
+            {session.matchLocation && ` — ${MATCH_LOCATION_LABEL[session.matchLocation]}`})
+          </span>
+        )}
+      </td>
       <td className="px-4 py-2 tabular-nums text-ink-secondary">{session.rawRowCount}</td>
       <td className="px-4 py-2">
         {session.warningCount > 0 ? (

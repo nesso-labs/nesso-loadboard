@@ -18,6 +18,24 @@ export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
   mix: 'Mix',
 }
 
+/** Outcome of a match session — not applicable to trainings. */
+export type MatchResult = 'win' | 'draw' | 'loss'
+
+export const MATCH_RESULT_LABEL: Record<MatchResult, string> = {
+  win: 'Vittoria',
+  draw: 'Pareggio',
+  loss: 'Sconfitta',
+}
+
+/** Where a match was played, and whether the trip added an extra travel day — not applicable to trainings. */
+export type MatchLocation = 'home' | 'away' | 'away_2d'
+
+export const MATCH_LOCATION_LABEL: Record<MatchLocation, string> = {
+  home: 'Casa',
+  away: 'Trasferta',
+  away_2d: 'Trasferta (2 giorni)',
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string
@@ -67,6 +85,10 @@ export interface Session {
   type: SessionType
   /** Only meaningful when type === 'training'. */
   trainingType?: TrainingType
+  /** Only meaningful when type === 'match'. */
+  matchResult?: MatchResult
+  /** Only meaningful when type === 'match'. */
+  matchLocation?: MatchLocation
   importedAt: string
   sourceFileName?: string
   rawRowCount: number

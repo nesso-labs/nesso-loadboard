@@ -3,11 +3,22 @@ import { useState } from 'react'
 import { CsvImportError } from '../lib/csv/parseSessionCsv'
 import { commitImport, stageImport, type StagedImport } from '../lib/csv/importSession'
 import { listPlayers } from '../lib/db/repo'
-import { TRAINING_TYPE_LABEL, type Player, type SessionType, type TrainingType } from '../types/domain'
+import {
+  MATCH_LOCATION_LABEL,
+  MATCH_RESULT_LABEL,
+  TRAINING_TYPE_LABEL,
+  type MatchLocation,
+  type MatchResult,
+  type Player,
+  type SessionType,
+  type TrainingType,
+} from '../types/domain'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useInvalidateAfterImport } from '../state/queries'
 
 const TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico_alte_velocita', 'rifinitura', 'recupero_attivo', 'mix']
+const MATCH_RESULTS: MatchResult[] = ['win', 'draw', 'loss']
+const MATCH_LOCATIONS: MatchLocation[] = ['home', 'away', 'away_2d']
 
 type Step = 'select' | 'metadata' | 'rpe' | 'done'
 
@@ -34,6 +45,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [label, setLabel] = useState('')
   const [type, setType] = useState<SessionType>('training')
   const [trainingType, setTrainingType] = useState<TrainingType>('mix')
+  const [matchResult, setMatchResult] = useState<MatchResult>('win')
+  const [matchLocation, setMatchLocation] = useState<MatchLocation>('home')
   const [staged, setStaged] = useState<StagedImport | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
@@ -60,6 +73,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
         label: label || fileName,
         type,
         trainingType: type === 'training' ? trainingType : undefined,
+        matchResult: type === 'match' ? matchResult : undefined,
+        matchLocation: type === 'match' ? matchLocation : undefined,
       })
       setStaged(result)
       const allPlayers = await listPlayers()
@@ -147,6 +162,41 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
                 Usata in Session v Session per confrontare allenamenti dello stesso tipo.
               </span>
             </label>
+          )}
+          {type === 'match' && (
+            <>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-ink">Esito</span>
+                <select
+                  value={matchResult}
+                  onChange={(e) => setMatchResult(e.target.value as MatchResult)}
+                  className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+                >
+                  {MATCH_RESULTS.map((r) => (
+                    <option key={r} value={r}>
+                      {MATCH_RESULT_LABEL[r]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-ink">Sede</span>
+                <select
+                  value={matchLocation}
+                  onChange={(e) => setMatchLocation(e.target.value as MatchLocation)}
+                  className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+                >
+                  {MATCH_LOCATIONS.map((l) => (
+                    <option key={l} value={l}>
+                      {MATCH_LOCATION_LABEL[l]}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-ink-muted">
+                  Usate in Game v Game per confrontare partite dello stesso esito o della stessa sede.
+                </span>
+              </label>
+            </>
           )}
           <div className="flex justify-between pt-2">
             <button
