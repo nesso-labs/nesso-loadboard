@@ -1,30 +1,38 @@
 @import "tailwindcss";
 
 /*
- * LoadBoard visual identity — light mode stays "night match under
- * floodlights" (pitch-tinted dark, trophy-gold accent). Dark mode (below)
- * is the primary "Sports Analytics" surface: a cool near-black with a
- * vivid yellow accent and a blue-tinted hairline on every card/tooltip.
- * Categorical + status + diverging heatmap hues are the `dataviz` skill's
- * validated reference values (checked with scripts/validate_palette.js)
- * — never re-themed; only the accent/border/surface tokens flex per-theme.
+ * LoadBoard visual identity — light mode is the primary surface: an ivory
+ * page with white cards, built to breathe (generous whitespace over dense
+ * chrome). Two brand hues carry distinct jobs, never interchangeably: a
+ * confident, trustworthy blue (`--color-primary`) for navigation, identity
+ * and wayfinding — the brand mark, the active nav item; a vivid yellow
+ * (`--color-accent`) reserved for calls-to-action and highlighted figures —
+ * buttons, the emphasized stat tile. Every hairline border/gridline across
+ * both themes carries a faint primary-blue tint, so the brand reads even in
+ * the quietest UI chrome. Dark mode (below) keeps its own "Sports Analytics"
+ * near-black surface with the same two-hue split. Categorical + status +
+ * diverging heatmap hues are the `dataviz` skill's validated reference
+ * values (checked with scripts/validate_palette.js) — never re-themed.
  */
 @theme {
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Oswald", "IBM Plex Sans", system-ui, sans-serif;
+  --font-sans: "Work Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Big Shoulders Display", "Work Sans", system-ui, sans-serif;
 
-  --color-page: #eff2ec;
-  --color-surface: #f9faf6;
-  --color-surface-raised: #ffffff;
-  --color-ink: #10201a;
-  --color-ink-secondary: #45564c;
-  --color-ink-muted: #7c8b82;
-  --color-grid: rgba(16, 32, 26, 0.08);
-  --color-baseline: rgba(16, 32, 26, 0.18);
-  --color-border: rgba(16, 32, 26, 0.12);
+  --color-page: #faf8f3;
+  --color-surface: #ffffff;
+  --color-surface-raised: #fbfcff;
+  --color-ink: #12172b;
+  --color-ink-secondary: #4b5468;
+  --color-ink-muted: #8991a3;
+  --color-grid: rgba(29, 78, 216, 0.08);
+  --color-baseline: rgba(29, 78, 216, 0.18);
+  --color-border: rgba(29, 78, 216, 0.14);
 
-  --color-accent: #8a6a19;
-  --color-accent-ink: #ffffff;
+  --color-primary: #1d4ed8;
+  --color-primary-ink: #ffffff;
+
+  --color-accent: #fbbf24;
+  --color-accent-ink: #12172b;
 
   --color-series-blue: #2a78d6;
   --color-series-orange: #eb6834;
@@ -57,6 +65,9 @@
     --color-grid: rgba(154, 187, 232, 0.12);
     --color-baseline: rgba(154, 187, 232, 0.24);
     --color-border: rgba(74, 156, 235, 0.22);
+
+    --color-primary: #3b82f6;
+    --color-primary-ink: #070c10;
 
     --color-accent: #f4c430;
     --color-accent-ink: #070c10;
