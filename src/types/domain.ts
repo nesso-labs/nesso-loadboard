@@ -103,6 +103,8 @@ export interface Player {
   id: string
   displayName: string
   position: Position
+  heightCm?: number
+  weightKg?: number
   personalMaxSpeedKmh?: number
   /** Has a human confirmed personalMaxSpeedKmh is a trustworthy reference? See lib/metrics/pb.ts. */
   pbConfirmed: boolean

@@ -16,15 +16,26 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
     patch.position === undefined &&
     patch.active === undefined &&
     patch.personalMaxSpeedKmh === undefined &&
-    patch.pbConfirmed === undefined
+    patch.pbConfirmed === undefined &&
+    patch.heightCm === undefined &&
+    patch.weightKg === undefined
   ) {
     return badRequest('nothing to update')
   }
 
   await env.DB.prepare(
-    'UPDATE players SET position = ?, personal_max_speed_kmh = ?, pb_confirmed = ?, active = ?, updated_at = ? WHERE id = ?',
+    'UPDATE players SET position = ?, height_cm = ?, weight_kg = ?, personal_max_speed_kmh = ?, pb_confirmed = ?, active = ?, updated_at = ? WHERE id = ?',
   )
-    .bind(updated.position, updated.personalMaxSpeedKmh ?? null, updated.pbConfirmed ? 1 : 0, updated.active ? 1 : 0, updated.updatedAt, id)
+    .bind(
+      updated.position,
+      updated.heightCm ?? null,
+      updated.weightKg ?? null,
+      updated.personalMaxSpeedKmh ?? null,
+      updated.pbConfirmed ? 1 : 0,
+      updated.active ? 1 : 0,
+      updated.updatedAt,
+      id,
+    )
     .run()
 
   return json(updated)

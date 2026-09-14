@@ -78,6 +78,16 @@ export function PlayerProfilePage() {
             {player.position}
           </span>
         )}
+        {player?.heightCm !== undefined && (
+          <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
+            {player.heightCm.toFixed(0)} cm
+          </span>
+        )}
+        {player?.weightKg !== undefined && (
+          <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
+            {player.weightKg.toFixed(1)} kg
+          </span>
+        )}
       </div>
 
       {loadingSegments ? null : sessionCount === 0 ? (

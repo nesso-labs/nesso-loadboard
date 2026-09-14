@@ -54,6 +54,8 @@ export async function putPlayer(player: Player): Promise<void> {
     body: JSON.stringify({
       position: player.position,
       active: player.active,
+      heightCm: player.heightCm,
+      weightKg: player.weightKg,
       personalMaxSpeedKmh: player.personalMaxSpeedKmh,
       pbConfirmed: player.pbConfirmed,
     }),
