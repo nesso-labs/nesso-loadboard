@@ -49,6 +49,8 @@ export function RosterPage() {
             <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
               <th className="px-4 py-2">Giocatore</th>
               <th className="px-4 py-2">Posizione</th>
+              <th className="px-4 py-2">Altezza (cm)</th>
+              <th className="px-4 py-2">Peso (kg)</th>
               <th className="px-4 py-2">Vmax personale</th>
               <th className="px-4 py-2">Attivo</th>
             </tr>
@@ -75,6 +77,38 @@ export function RosterPage() {
                       </option>
                     ))}
                   </select>
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={player.heightCm ?? ''}
+                    onChange={(e) =>
+                      updatePlayer.mutate({
+                        ...player,
+                        heightCm: e.target.value === '' ? undefined : Number(e.target.value),
+                        updatedAt: new Date().toISOString(),
+                      })
+                    }
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink"
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={player.weightKg ?? ''}
+                    onChange={(e) =>
+                      updatePlayer.mutate({
+                        ...player,
+                        weightKg: e.target.value === '' ? undefined : Number(e.target.value),
+                        updatedAt: new Date().toISOString(),
+                      })
+                    }
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink"
+                  />
                 </td>
                 <td className="px-4 py-2">
                   {player.personalMaxSpeedKmh === undefined ? (

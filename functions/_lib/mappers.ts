@@ -45,7 +45,18 @@ export function rowToSession(r: Record<string, unknown>): Session {
 // --- players ---
 
 export function playerToRow(p: Player): unknown[] {
-  return [p.id, p.displayName, p.position, p.personalMaxSpeedKmh ?? null, p.pbConfirmed ? 1 : 0, p.active ? 1 : 0, p.createdAt, p.updatedAt]
+  return [
+    p.id,
+    p.displayName,
+    p.position,
+    p.heightCm ?? null,
+    p.weightKg ?? null,
+    p.personalMaxSpeedKmh ?? null,
+    p.pbConfirmed ? 1 : 0,
+    p.active ? 1 : 0,
+    p.createdAt,
+    p.updatedAt,
+  ]
 }
 
 export function rowToPlayer(r: Record<string, unknown>): Player {
@@ -53,6 +64,8 @@ export function rowToPlayer(r: Record<string, unknown>): Player {
     id: r.id as string,
     displayName: r.display_name as string,
     position: r.position as Player['position'],
+    heightCm: (r.height_cm as number | null) ?? undefined,
+    weightKg: (r.weight_kg as number | null) ?? undefined,
     personalMaxSpeedKmh: (r.personal_max_speed_kmh as number | null) ?? undefined,
     pbConfirmed: Boolean(r.pb_confirmed),
     active: Boolean(r.active),
