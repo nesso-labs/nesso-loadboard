@@ -1,15 +1,34 @@
 import { BarChart3 } from 'lucide-react'
 import { MetricTrendPanel } from '../components/charts/MetricTrendPanel'
 import { EmptyState } from '../components/ui/EmptyState'
-import { distanceAbove19_8, distanceAbove25_2 } from '../lib/metrics/metricsCatalog'
+import { HeatmapTable, type HeatmapColumn, type HeatmapGroup } from '../components/ui/HeatmapTable'
+import { distanceAbove19_8, distanceAbove25_2, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
+import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { rollingAverageByDateWindow } from '../lib/metrics/timeSeries'
 import { mean } from '../lib/utils'
-import { useAllRpeQuery, useAllSegmentsQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import type { Player, Position } from '../types/domain'
+
+const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
+const POSITION_LABEL: Record<Position, string> = {
+  GK: 'Portieri',
+  DEF: 'Difensori',
+  MID: 'Centrocampisti',
+  FWD: 'Attaccanti',
+  UNSPECIFIED: 'Non assegnati',
+}
+
+interface MicrocycleRow {
+  player: Player
+  sessionsSinceLastMatch: number
+  pctByMetricKey: Record<string, number | null>
+}
 
 export function DynamicLoadPage() {
   const { data: sessions = [], isLoading: loadingSessions } = useSessionsQuery()
   const { data: segments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
   const { data: rpe = [] } = useAllRpeQuery()
+  const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
 
   if (loadingSessions || loadingSegments || !settings) return null
@@ -55,6 +74,50 @@ export function DynamicLoadPage() {
 
   const singleSession = sessions.length === 1
 
+  const activePlayers = players.filter((p) => p.active)
+  const microcycleRows: MicrocycleRow[] = activePlayers.map((player) => {
+    const playerSegments = segments.filter((s) => s.playerId === player.id)
+    const pctByMetricKey: Record<string, number | null> = {}
+    let sessionsSinceLastMatch = 0
+    MICROCYCLE_METRICS.forEach((def, i) => {
+      const result = computeMicrocycleCompletion(player.id, sessions, playerSegments, (s) => def.metric(s, settings))
+      pctByMetricKey[def.key] = result.pct
+      if (i === 0) sessionsSinceLastMatch = result.sessionsSinceLastMatch
+    })
+    return { player, sessionsSinceLastMatch, pctByMetricKey }
+  })
+
+  const microcycleColumns: HeatmapColumn<MicrocycleRow>[] = [
+    {
+      key: 'sessionsSinceLastMatch',
+      label: 'Allenamenti da ultima partita',
+      getValue: (r) => r.sessionsSinceLastMatch,
+      format: (v) => v.toFixed(0),
+    },
+    ...MICROCYCLE_METRICS.map(
+      (def): HeatmapColumn<MicrocycleRow> => ({
+        key: def.key,
+        label: def.label,
+        unit: '%',
+        getValue: (r) => r.pctByMetricKey[def.key],
+        format: (v) => v.toFixed(0),
+      }),
+    ),
+  ]
+
+  const microcycleGroupsByPosition = new Map<Position, MicrocycleRow[]>()
+  for (const row of microcycleRows) {
+    const list = microcycleGroupsByPosition.get(row.player.position) ?? []
+    list.push(row)
+    microcycleGroupsByPosition.set(row.player.position, list)
+  }
+  const microcycleGroups: HeatmapGroup<MicrocycleRow>[] = POSITION_ORDER.filter((pos) =>
+    microcycleGroupsByPosition.has(pos),
+  ).map((pos) => ({
+    label: POSITION_LABEL[pos],
+    rows: microcycleGroupsByPosition.get(pos)!.sort((a, b) => a.player.displayName.localeCompare(b.player.displayName)),
+  }))
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-secondary">
@@ -85,6 +148,21 @@ export function DynamicLoadPage() {
           )
         })}
       </div>
+
+      {microcycleRows.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-ink-secondary">
+            Per giocatore: allenamenti svolti dall'ultima partita a oggi, e ogni metrica di carico come % rispetto a
+            un microciclo tipo storico (Ripresa + Forza + Metabolico + Rifinitura).
+          </p>
+          <HeatmapTable
+            columns={microcycleColumns}
+            groups={microcycleGroups}
+            getRowKey={(r) => r.player.id}
+            getRowLabel={(r) => r.player.displayName}
+          />
+        </div>
+      )}
     </div>
   )
 }

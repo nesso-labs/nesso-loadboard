@@ -4,7 +4,8 @@ import { HEAT_BAND_VAR, heatBand, median } from '../../lib/metrics/heatmap'
 export interface HeatmapColumn<T> {
   key: string
   label: string
-  getValue: (row: T) => number
+  /** Null means "no data for this cell" — rendered as a dash, uncolored, and excluded from the column median. */
+  getValue: (row: T) => number | null
   format?: (value: number) => string
   unit?: string
 }
@@ -29,7 +30,10 @@ interface HeatmapTableProps<T> {
  */
 export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: HeatmapTableProps<T>) {
   const allRows = groups.flatMap((g) => g.rows)
-  const medians = columns.map((col) => median(allRows.map((r) => col.getValue(r))))
+  const medians = columns.map((col) => {
+    const values = allRows.map((r) => col.getValue(r)).filter((v): v is number => v !== null)
+    return values.length > 0 ? median(values) : null
+  })
 
   const fmt = (col: HeatmapColumn<T>, value: number) => (col.format ? col.format(value) : value.toFixed(1))
 
@@ -50,7 +54,7 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
             <td className="sticky left-0 z-10 bg-page/60 px-4 py-2">Mediana squadra</td>
             {medians.map((m, i) => (
               <td key={columns[i].key} className="px-3 py-2 text-right tabular-nums">
-                {fmt(columns[i], m)}
+                {m === null ? '—' : fmt(columns[i], m)}
               </td>
             ))}
           </tr>
@@ -73,7 +77,8 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
                   <td className="sticky left-0 z-10 bg-surface px-4 py-2 font-medium text-ink">{getRowLabel(row)}</td>
                   {columns.map((col, i) => {
                     const value = col.getValue(row)
-                    const band = heatBand(value, medians[i])
+                    const columnMedian = medians[i]
+                    const band = value !== null && columnMedian !== null ? heatBand(value, columnMedian) : 'neutral'
                     const bg = HEAT_BAND_VAR[band]
                     return (
                       <td
@@ -81,7 +86,7 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
                         className="px-3 py-2 text-right tabular-nums text-ink"
                         style={bg ? { backgroundColor: bg } : undefined}
                       >
-                        {fmt(col, value)}
+                        {value === null ? '—' : fmt(col, value)}
                       </td>
                     )
                   })}
