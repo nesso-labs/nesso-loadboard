@@ -1,8 +1,10 @@
 import { ArrowRight, ShieldCheck, Upload } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity } from '../lib/metrics/alerts'
+import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
@@ -28,6 +30,7 @@ export function OverviewPage() {
   const { data: settings } = useSettingsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: allSegments = [] } = useAllSegmentsQuery()
+  const [microMetricKey, setMicroMetricKey] = useState(MICROCYCLE_METRICS[0].key)
 
   if (isLoading) return null
 
@@ -60,18 +63,21 @@ export function OverviewPage() {
   const flags = settings ? computeSessionAlerts(fullSessionRows, rpe, settings) : []
 
   const activePlayers = players.filter((p) => p.active)
-  const microcycleByPlayer = activePlayers
-    .map((p) => ({
-      player: p,
-      result: computeMicrocycleCompletion(
-        p.id,
-        sessions,
-        allSegments.filter((s) => s.playerId === p.id),
-        (s) => s.totalDistanceM,
-      ),
-    }))
-    .filter((r) => r.result.pct !== null)
-    .sort((a, b) => (a.result.pct ?? 0) - (b.result.pct ?? 0))
+  const microMetricDef = MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? MICROCYCLE_METRICS[0]
+  const microcycleByPlayer = settings
+    ? activePlayers
+        .map((p) => ({
+          player: p,
+          result: computeMicrocycleCompletion(
+            p.id,
+            sessions,
+            allSegments.filter((s) => s.playerId === p.id),
+            (s) => microMetricDef.metric(s, settings),
+          ),
+        }))
+        .filter((r) => r.result.pct !== null)
+        .sort((a, b) => (a.result.pct ?? 0) - (b.result.pct ?? 0))
+    : []
   const teamAvgMicrocyclePct =
     microcycleByPlayer.length > 0
       ? microcycleByPlayer.reduce((sum, r) => sum + (r.result.pct ?? 0), 0) / microcycleByPlayer.length
@@ -130,18 +136,32 @@ export function OverviewPage() {
 
       {microcycleByPlayer.length > 0 && (
         <div className="panel p-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="font-display text-base font-medium text-ink">Completamento microciclo — squadra</p>
-            <Link to="/players" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
-              Vedi per giocatore <ArrowRight className="size-3.5" />
-            </Link>
+            <div className="flex items-center gap-3">
+              <select
+                value={microMetricKey}
+                onChange={(e) => setMicroMetricKey(e.target.value)}
+                className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink"
+              >
+                {MICROCYCLE_METRICS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <Link to="/players" className="flex items-center gap-1 text-xs font-medium text-accent hover:opacity-80">
+                Vedi per giocatore <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
           </div>
           <p className="mb-3 text-sm text-ink-secondary">
             Media squadra:{' '}
             <span className="font-display text-lg font-semibold tabular-nums text-ink">
               {teamAvgMicrocyclePct?.toFixed(0)}%
             </span>{' '}
-            del carico di una settimana tipo storica, da giocatore attivo con dati sufficienti.
+            di "{microMetricDef.label}" rispetto a una settimana tipo storica (Ripresa + Forza + Metabolico +
+            Rifinitura), da giocatore attivo con dati sufficienti.
           </p>
           <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
             {microcycleByPlayer.slice(0, 12).map(({ player, result }) => (
