@@ -75,6 +75,15 @@ export function DynamicLoadPage() {
   const singleSession = sessions.length === 1
 
   const trackedMicrocycleMetrics = MICROCYCLE_METRICS.filter((m) => m.key !== 'duration')
+  const shortMetricLabel: Record<string, string> = {
+    totalDistance: 'Dist. tot.',
+    hsr: 'HSR (>19.8)',
+    sprintDistance: 'Dist. sprint',
+    sprintCount: 'N. sprint',
+    mechanicalWork: 'MechW',
+    accHigh: 'Acc. alte',
+    decHigh: 'Dec. alte',
+  }
 
   const activePlayers = players.filter((p) => p.active)
   const microcycleRows: MicrocycleRow[] = activePlayers.map((player) => {
@@ -92,14 +101,14 @@ export function DynamicLoadPage() {
   const microcycleColumns: HeatmapColumn<MicrocycleRow>[] = [
     {
       key: 'sessionsSinceLastMatch',
-      label: 'Allenamenti da ultima partita',
+      label: 'Sedute da ultima gara',
       getValue: (r) => r.sessionsSinceLastMatch,
       format: (v) => v.toFixed(0),
     },
     ...trackedMicrocycleMetrics.map(
       (def): HeatmapColumn<MicrocycleRow> => ({
         key: def.key,
-        label: def.label,
+        label: shortMetricLabel[def.key] ?? def.label,
         unit: '%',
         getValue: (r) => r.pctByMetricKey[def.key],
         format: (v) => v.toFixed(0),
