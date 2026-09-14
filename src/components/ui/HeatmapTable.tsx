@@ -20,6 +20,8 @@ interface HeatmapTableProps<T> {
   groups: HeatmapGroup<T>[]
   getRowLabel: (row: T) => string
   getRowKey: (row: T) => string
+  /** Denser type/padding, and never clipped when printed — for tables with many columns. */
+  compact?: boolean
 }
 
 /**
@@ -28,7 +30,7 @@ interface HeatmapTableProps<T> {
  * median. The number is always printed — color is a secondary cue, never
  * the only signal (dataviz skill: never color alone).
  */
-export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: HeatmapTableProps<T>) {
+export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey, compact }: HeatmapTableProps<T>) {
   const allRows = groups.flatMap((g) => g.rows)
   const medians = columns.map((col) => {
     const values = allRows.map((r) => col.getValue(r)).filter((v): v is number => v !== null)
@@ -37,23 +39,26 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
 
   const fmt = (col: HeatmapColumn<T>, value: number) => (col.format ? col.format(value) : value.toFixed(1))
 
+  const firstColPad = compact ? 'px-3 py-1 print:px-1.5 print:py-0.5' : 'px-4 py-2'
+  const cellPad = compact ? 'px-2 py-1 print:px-1.5 print:py-0.5' : 'px-3 py-2'
+
   return (
-    <div className="overflow-x-auto panel">
-      <table className="w-full whitespace-nowrap text-sm">
+    <div className={`overflow-x-auto panel ${compact ? 'print:overflow-visible' : ''}`}>
+      <table className={`w-full whitespace-nowrap ${compact ? 'text-xs print:text-[8px]' : 'text-sm'}`}>
         <thead>
           <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
-            <th className="sticky left-0 z-10 bg-surface px-4 py-2">Giocatore</th>
+            <th className={`sticky left-0 z-10 bg-surface ${firstColPad}`}>Giocatore</th>
             {columns.map((col) => (
-              <th key={col.key} className="px-3 py-2 text-right">
+              <th key={col.key} className={`${cellPad} text-right`}>
                 {col.label}
                 {col.unit && <span className="ml-1 normal-case text-ink-muted">({col.unit})</span>}
               </th>
             ))}
           </tr>
           <tr className="border-b border-border bg-page/60 text-xs font-semibold text-ink">
-            <td className="sticky left-0 z-10 bg-page/60 px-4 py-2">Mediana squadra</td>
+            <td className={`sticky left-0 z-10 bg-page/60 ${firstColPad}`}>Mediana squadra</td>
             {medians.map((m, i) => (
-              <td key={columns[i].key} className="px-3 py-2 text-right tabular-nums">
+              <td key={columns[i].key} className={`${cellPad} text-right tabular-nums`}>
                 {m === null ? '—' : fmt(columns[i], m)}
               </td>
             ))}
@@ -74,7 +79,9 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
               )}
               {group.rows.map((row) => (
                 <tr key={getRowKey(row)} className="border-b border-border last:border-0">
-                  <td className="sticky left-0 z-10 bg-surface px-4 py-2 font-medium text-ink">{getRowLabel(row)}</td>
+                  <td className={`sticky left-0 z-10 bg-surface font-medium text-ink ${firstColPad}`}>
+                    {getRowLabel(row)}
+                  </td>
                   {columns.map((col, i) => {
                     const value = col.getValue(row)
                     const columnMedian = medians[i]
@@ -83,7 +90,7 @@ export function HeatmapTable<T>({ columns, groups, getRowLabel, getRowKey }: Hea
                     return (
                       <td
                         key={col.key}
-                        className="px-3 py-2 text-right tabular-nums text-ink"
+                        className={`text-right tabular-nums text-ink ${cellPad}`}
                         style={bg ? { backgroundColor: bg } : undefined}
                       >
                         {value === null ? '—' : fmt(col, value)}

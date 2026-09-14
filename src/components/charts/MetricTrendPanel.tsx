@@ -18,9 +18,10 @@ interface MetricTrendPanelProps {
 }
 
 /**
- * One metric's small-multiple: a bar per session (darker = match, lighter =
- * training — identity by fill, not hue, since these are the same series)
- * plus a rolling-average line overlay. Same Y axis for both (never dual-axis).
+ * One metric's small-multiple: a bar per session (one hue — full opacity for
+ * a match, dimmed for a training — identity by lightness, not a second hue,
+ * since these are the same series) plus a rolling-average line overlay in a
+ * second hue for contrast. Same Y axis for both (never dual-axis).
  */
 export function MetricTrendPanel({ title, unit, points, rolling, latestValue, format = (v) => v.toFixed(0) }: MetricTrendPanelProps) {
   const data = points.map((p, i) => ({ ...p, rolling: rolling[i] }))
@@ -47,10 +48,10 @@ export function MetricTrendPanel({ title, unit, points, rolling, latestValue, fo
           />
           <Bar dataKey="value" radius={[2, 2, 0, 0]}>
             {data.map((point, i) => (
-              <Cell key={i} fill={point.type === 'match' ? 'var(--color-ink-secondary)' : 'var(--color-baseline)'} />
+              <Cell key={i} fill="var(--color-series-blue)" fillOpacity={point.type === 'match' ? 1 : 0.35} />
             ))}
           </Bar>
-          <Line type="monotone" dataKey="rolling" stroke="var(--color-series-red)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="rolling" stroke="var(--color-series-yellow)" strokeWidth={2} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
