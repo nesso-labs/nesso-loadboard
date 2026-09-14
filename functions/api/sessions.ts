@@ -1,5 +1,6 @@
 import { badRequest, json } from '../_lib/json'
 import { type Env, rowToSession, sessionToRow } from '../_lib/mappers'
+import { ensureColumns } from '../_lib/schema'
 import type { Session } from '../../src/types/domain'
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
@@ -10,6 +11,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const session = (await request.json()) as Session
   if (!session?.id || !session.date) return badRequest('session id and date are required')
+
+  await ensureColumns(env, 'sessions', [
+    { name: 'training_type', type: 'TEXT' },
+    { name: 'match_result', type: 'TEXT' },
+    { name: 'match_location', type: 'TEXT' },
+  ])
 
   await env.DB.prepare(
     `INSERT INTO sessions (id, date, label, type, training_type, match_result, match_location, imported_at, source_file_name, raw_row_count, warning_count, notes, reconciliation)
