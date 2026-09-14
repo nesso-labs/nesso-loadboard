@@ -1,5 +1,5 @@
-import type { DrillSegment, MatchLocation, MatchResult, Player, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
-import { listPlayers, putPlayer, putRpeEntries, putSegments, putSession } from '../db/repo'
+import type { DrillSegment, MatchLocation, MatchResult, ReassignmentAudit, RpeEntry, Session, SessionType, TrainingType } from '../../types/domain'
+import { listPlayers, putPlayers, putRpeEntries, putSegments, putSession } from '../db/repo'
 import { evaluatePlayerPb } from '../metrics/pb'
 import { parseSessionCsv } from './parseSessionCsv'
 import { reconcileRows } from './reconcile'
@@ -106,7 +106,13 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
   return session
 }
 
-/** Auto-updates a player's recorded max speed when this session beats it — flips pbConfirmed to false so it surfaces on the Data Quality page until a human checks it. */
+/**
+ * Auto-updates a player's recorded max speed when this session beats it —
+ * flips pbConfirmed to false so it surfaces on the Data Quality page until a
+ * human checks it. Batched into one request: a match session, with faster
+ * sprints than training, routinely sets new records for most of the squad at
+ * once, and one PATCH per player was the main reason match imports lagged.
+ */
 async function updatePersonalBests(segments: StagedImport['segments']): Promise<void> {
   const maxSpeedByPlayer = new Map<string, number>()
   for (const seg of segments) {
@@ -117,15 +123,13 @@ async function updatePersonalBests(segments: StagedImport['segments']): Promise<
   const players = await listPlayers()
   const playerById = new Map(players.map((p) => [p.id, p]))
 
-  await Promise.all(
-    [...maxSpeedByPlayer.entries()].map(async ([playerId, sessionMax]) => {
-      const player = playerById.get(playerId)
-      if (!player) return
-      const evaluation = evaluatePlayerPb(player, sessionMax)
-      if (evaluation.status === 'new_record') {
-        const updated: Player = { ...player, personalMaxSpeedKmh: sessionMax, pbConfirmed: false }
-        await putPlayer(updated)
-      }
-    }),
-  )
+  const patches = [...maxSpeedByPlayer.entries()].flatMap(([playerId, sessionMax]) => {
+    const player = playerById.get(playerId)
+    if (!player) return []
+    const evaluation = evaluatePlayerPb(player, sessionMax)
+    if (evaluation.status !== 'new_record') return []
+    return [{ id: playerId, personalMaxSpeedKmh: sessionMax, pbConfirmed: false }]
+  })
+
+  await putPlayers(patches)
 }

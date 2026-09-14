@@ -65,7 +65,7 @@ export function useSettingsQuery() {
   return useQuery({ queryKey: queryKeys.settings, queryFn: getSettings })
 }
 
-/** Invalidates everything a session import/edit/delete/RPE change can affect. */
+/** Invalidates everything a session import or delete can affect — segments and RPE included, since both write those tables. Broad on purpose; use a narrower invalidator below for a metadata-only or RPE-only edit, which don't touch segments at all. */
 export function useInvalidateAfterImport() {
   const queryClient = useQueryClient()
   return () => {
@@ -73,5 +73,20 @@ export function useInvalidateAfterImport() {
     queryClient.invalidateQueries({ queryKey: queryKeys.players })
     queryClient.invalidateQueries({ queryKey: ['segments'] })
     queryClient.invalidateQueries({ queryKey: ['rpe'] })
+  }
+}
+
+/** For a session metadata-only edit (type/trainingType/matchResult/matchLocation) — nothing else changed, so refetching all segments/RPE would just be wasted work. */
+export function useInvalidateSessionMetadata() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.sessions })
+}
+
+/** For an RPE-only edit on one session — no session/segment data changed. */
+export function useInvalidateRpe() {
+  const queryClient = useQueryClient()
+  return (sessionId: string) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.rpeBySession(sessionId) })
+    queryClient.invalidateQueries({ queryKey: queryKeys.allRpe })
   }
 }

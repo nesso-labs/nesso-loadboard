@@ -7,6 +7,8 @@ import { buildRpeEntries } from '../lib/csv/importSession'
 import { deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
 import {
   useInvalidateAfterImport,
+  useInvalidateRpe,
+  useInvalidateSessionMetadata,
   usePlayersQuery,
   useRpeBySessionQuery,
   useSegmentsBySessionQuery,
@@ -32,7 +34,9 @@ type Panel = 'none' | 'edit' | 'rpe'
 function SessionRow({ session }: { session: Session }) {
   const { data: rpe = [] } = useRpeBySessionQuery(session.id)
   const { data: players = [] } = usePlayersQuery()
-  const invalidate = useInvalidateAfterImport()
+  const invalidateAfterDelete = useInvalidateAfterImport()
+  const invalidateMetadata = useInvalidateSessionMetadata()
+  const invalidateRpe = useInvalidateRpe()
 
   const [panel, setPanel] = useState<Panel>('none')
   const [deleting, setDeleting] = useState(false)
@@ -79,7 +83,7 @@ function SessionRow({ session }: { session: Session }) {
       matchLocation: type === 'match' ? matchLocation : undefined,
     }
     await putSession(updated)
-    invalidate()
+    invalidateMetadata()
     setSavingMeta(false)
     setPanel('none')
   }
@@ -88,7 +92,7 @@ function SessionRow({ session }: { session: Session }) {
     setSavingRpe(true)
     const entries = buildRpeEntries(session.id, segments, rpeDraft)
     if (entries.length > 0) await putRpeEntries(entries)
-    invalidate()
+    invalidateRpe(session.id)
     setSavingRpe(false)
     setPanel('none')
   }
@@ -100,7 +104,7 @@ function SessionRow({ session }: { session: Session }) {
     if (!confirmed) return
     setDeleting(true)
     await deleteSession(session.id)
-    invalidate()
+    invalidateAfterDelete()
   }
 
   return (
