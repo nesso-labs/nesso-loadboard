@@ -7,7 +7,11 @@ import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment, type Position } from '../types/domain'
 
-const MIN_COMPARABLE_SESSIONS = 3
+// Counted as "sessions of this type" INCLUDING the one currently open — a
+// coach counting "I have 3 Forza sessions" naturally counts the one they're
+// looking at too, so the historical (non-current) threshold is one less.
+const MIN_COMPARABLE_TOTAL_SESSIONS = 3
+const MIN_COMPARABLE_HISTORY = MIN_COMPARABLE_TOTAL_SESSIONS - 1
 const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
 
 interface MetricSpec {
@@ -98,7 +102,8 @@ export function SessionVSessionPage() {
             {currentSession.type === 'training' && currentSession.trainingType
               ? ` su allenamenti dello stesso tipo (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
               : ` su sessioni dello stesso tipo (${currentSession.type === 'match' ? 'partita' : 'allenamento'})`}
-            . Servono almeno {MIN_COMPARABLE_SESSIONS} sessioni storiche per giocatore per un confronto affidabile.
+            . Servono almeno {MIN_COMPARABLE_TOTAL_SESSIONS} sessioni dello stesso tipo per giocatore (questa inclusa)
+            per un confronto affidabile.
           </p>
         </div>
         {currentSession.type === 'training' && currentSession.trainingType && (
@@ -142,17 +147,18 @@ export function SessionVSessionPage() {
                       <td className="px-4 py-2 font-medium text-ink">{row.name}</td>
                       {metrics.map((m) => {
                         const current = m.getValue(row.seg)
-                        const enoughHistory = row.history.length >= MIN_COMPARABLE_SESSIONS
+                        const totalSessions = row.history.length + 1 // history + the one currently open
+                        const enoughHistory = row.history.length >= MIN_COMPARABLE_HISTORY
                         const historyMedian = enoughHistory ? median(row.history.map(m.getValue)) : null
                         return (
                           <td key={m.key} className="px-3 py-2 text-right tabular-nums text-ink">
                             {current.toFixed(0)}
                             {historyMedian !== null ? (
                               <span className="ml-1 text-xs text-ink-muted">
-                                vs {historyMedian.toFixed(0)} (n={row.history.length})
+                                vs {historyMedian.toFixed(0)} (n={totalSessions})
                               </span>
                             ) : (
-                              <span className="ml-1 text-xs text-ink-muted">(n={row.history.length}, insuff.)</span>
+                              <span className="ml-1 text-xs text-ink-muted">(n={totalSessions}, insuff.)</span>
                             )}
                           </td>
                         )
