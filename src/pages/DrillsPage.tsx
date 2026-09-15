@@ -35,6 +35,7 @@ export function DrillsPage() {
   const [selectedDrill, setSelectedDrill] = useState<string | null>(null)
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
 
   const drillTitles = useMemo(() => [...new Set(segments.map((s) => s.drillTitle))], [segments])
 
@@ -52,7 +53,7 @@ export function DrillsPage() {
     )
   }
 
-  const rowsForDrill = segments.filter((s) => s.drillTitle === activeDrill)
+  const rowsForDrill = segments.filter((s) => s.drillTitle === activeDrill && activePlayerIds.has(s.playerId))
 
   const columns: HeatmapColumn<DrillSegment>[] = [
     { key: 'duration', label: 'Durata', unit: 'min', getValue: (s) => s.durationSec / 60, format: (v) => v.toFixed(0) },

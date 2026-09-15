@@ -29,6 +29,7 @@ export function DataQualityPage() {
   const queryClient = useQueryClient()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
 
   const confirmPb = useMutation({
     mutationFn: (player: Player) => putPlayer({ ...player, pbConfirmed: true }),
@@ -41,11 +42,13 @@ export function DataQualityPage() {
   // Match-day exports never carry a "Full Session" row by design (only 1st/2nd
   // Half) — that's the normal shape of this export, not a data-quality issue, so
   // it's not flagged here. Only a training session missing one is unusual.
-  const synthesized = segments.filter((s) => s.isSynthesizedFullSession && currentSession.type !== 'match')
+  const synthesized = segments.filter(
+    (s) => s.isSynthesizedFullSession && currentSession.type !== 'match' && activePlayerIds.has(s.playerId),
+  )
   const playersInSession = new Set(segments.map((s) => s.playerId))
 
   const pbFlags = players
-    .filter((p) => playersInSession.has(p.id))
+    .filter((p) => p.active && playersInSession.has(p.id))
     .map((p) => {
       const sessionSegs = segments.filter((s) => s.playerId === p.id)
       const sessionMax = Math.max(0, ...sessionSegs.map((s) => s.maxSpeedKmh))

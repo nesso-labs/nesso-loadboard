@@ -23,11 +23,14 @@ interface MetricSpec {
 export function SessionVSessionPage() {
   const { currentSession } = useCurrentSession()
   const { data: sessions = [] } = useSessionsQuery()
-  const { data: segments = [], isLoading } = useAllSegmentsQuery()
+  const { data: rawSegments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
+  // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
+  const segments = useMemo(() => rawSegments.filter((s) => activePlayerIds.has(s.playerId)), [rawSegments, activePlayerIds])
   const [includeAllTrainingTypes, setIncludeAllTrainingTypes] = useState(false)
 
   if (!currentSession || isLoading || !settings) return null

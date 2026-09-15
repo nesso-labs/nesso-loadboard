@@ -34,13 +34,16 @@ const TARGET_MULTIPLIER: Record<string, number> = { td: 2.5, d198: 1.5, d252: 1.
 export function SessionVGamePage() {
   const { currentSession } = useCurrentSession()
   const { data: sessions = [] } = useSessionsQuery()
-  const { data: segments = [], isLoading } = useAllSegmentsQuery()
+  const { data: rawSegments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
   const [selectedTrainingId, setSelectedTrainingId] = useState<string | undefined>(undefined)
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | undefined>(undefined)
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
+  // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
+  const segments = useMemo(() => rawSegments.filter((s) => activePlayerIds.has(s.playerId)), [rawSegments, activePlayerIds])
 
   const trainingSessions = useMemo(
     () => sessions.filter((s) => s.type === 'training').sort((a, b) => b.date.localeCompare(a.date)),

@@ -26,8 +26,8 @@ interface MicrocycleRow {
 
 export function DynamicLoadPage() {
   const { data: sessions = [], isLoading: loadingSessions } = useSessionsQuery()
-  const { data: segments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
-  const { data: rpe = [] } = useAllRpeQuery()
+  const { data: rawSegments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
+  const { data: rawRpe = [] } = useAllRpeQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
 
@@ -42,6 +42,11 @@ export function DynamicLoadPage() {
       />
     )
   }
+
+  // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
+  const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
+  const segments = rawSegments.filter((s) => activePlayerIds.has(s.playerId))
+  const rpe = rawRpe.filter((r) => activePlayerIds.has(r.playerId))
 
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date))
   const fullSessionByDate = sorted.map((session) => {

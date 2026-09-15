@@ -34,10 +34,11 @@ export function ComparePage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const playerById = new Map(players.map((p) => [p.id, p]))
+  const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
 
   if (!currentSession || isLoading || !settings) return null
 
-  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session')
+  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId))
 
   if (fullSessionSegs.length === 0) {
     return (

@@ -20,15 +20,16 @@ export function PlayerProfilePage() {
   const { data: settings } = useSettingsQuery()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
 
-  const activePlayerId = selectedId ?? players[0]?.id
+  const activeRosterPlayers = useMemo(() => players.filter((p) => p.active), [players])
+  const activePlayerId = selectedId && activeRosterPlayers.some((p) => p.id === selectedId) ? selectedId : activeRosterPlayers[0]?.id
   const { data: segments = [], isLoading: loadingSegments } = useSegmentsByPlayerQuery(activePlayerId)
 
   const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions])
-  const player = players.find((p) => p.id === activePlayerId)
+  const player = activeRosterPlayers.find((p) => p.id === activePlayerId)
 
   if (loadingPlayers) return null
 
-  if (players.length === 0) {
+  if (activeRosterPlayers.length === 0) {
     return (
       <EmptyState
         icon={UserCircle}
@@ -66,7 +67,7 @@ export function PlayerProfilePage() {
             onChange={(e) => setSelectedId(e.target.value)}
             className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
           >
-            {players.map((p) => (
+            {activeRosterPlayers.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.displayName}
               </option>
