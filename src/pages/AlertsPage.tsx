@@ -1,9 +1,15 @@
 import { AlertTriangle, ShieldCheck } from 'lucide-react'
 import { useMemo } from 'react'
 import { EmptyState } from '../components/ui/EmptyState'
-import { computeSessionAlerts, type AlertSeverity } from '../lib/metrics/alerts'
+import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { usePlayersQuery, useRpeBySessionQuery, useSegmentsBySessionQuery, useSettingsQuery } from '../state/queries'
+import {
+  useAllSegmentsQuery,
+  usePlayersQuery,
+  useRpeBySessionQuery,
+  useSegmentsBySessionQuery,
+  useSettingsQuery,
+} from '../state/queries'
 
 const SEVERITY_STYLE: Record<AlertSeverity, string> = {
   critical: 'bg-status-critical/15 text-status-critical',
@@ -18,8 +24,9 @@ const SEVERITY_LABEL: Record<AlertSeverity, string> = {
 }
 
 export function AlertsPage() {
-  const { currentSession } = useCurrentSession()
+  const { currentSession, sessions } = useCurrentSession()
   const { data: segments = [], isLoading: loadingSegments } = useSegmentsBySessionQuery(currentSession?.id)
+  const { data: allSegments = [] } = useAllSegmentsQuery()
   const { data: rpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const { data: settings } = useSettingsQuery()
   const { data: players = [] } = usePlayersQuery()
@@ -41,13 +48,19 @@ export function AlertsPage() {
     )
   }
 
-  const flags = computeSessionAlerts(fullSessionSegs, rpe, settings)
+  const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
+  const recentFullSessions: DatedFullSession[] = allSegments
+    .filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
+
+  const flags = computeSessionAlerts(fullSessionSegs, rpe, settings, recentFullSessions, currentSession.date)
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-secondary">
-        Alert relativi a questa sessione: deficit di velocità massima (vs il proprio storico) e carichi anomali
-        rispetto alla mediana squadra di oggi. Le regole si affineranno con più storico disponibile.
+        Alert relativi a questa sessione: deficit di velocità massima (vs il proprio storico), esposizione a
+        velocità alta negli ultimi 7 giorni, e carichi anomali rispetto alla mediana squadra di oggi. Le regole si
+        affineranno con più storico disponibile.
       </p>
 
       {flags.length === 0 ? (

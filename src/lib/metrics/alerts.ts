@@ -6,9 +6,24 @@ export type AlertSeverity = 'warning' | 'serious' | 'critical'
 
 export interface AlertFlag {
   playerId: string
-  type: 'speed-deficit' | 'high-mech-work' | 'high-volume' | 'high-srpe'
+  type: 'speed-deficit' | 'high-mech-work' | 'high-volume' | 'high-srpe' | 'low-speed-exposure'
   severity: AlertSeverity
   message: string
+}
+
+/** One full_session row plus the date of the session it belongs to — needed to build the rolling speed-exposure window below. */
+export interface DatedFullSession {
+  seg: DrillSegment
+  date: string
+}
+
+const SPEED_EXPOSURE_WINDOW_DAYS = 7
+const SPEED_EXPOSURE_PCT_THRESHOLD = 90
+
+function isoDateMinusDays(dateIso: string, days: number): string {
+  const d = new Date(dateIso + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() - days)
+  return d.toISOString().slice(0, 10)
 }
 
 /**
@@ -18,11 +33,17 @@ export interface AlertFlag {
  * relative to THIS session's own team median (same deviation bands as the
  * Drills heatmap), which is useful even on a single imported session but
  * will get more meaningful once real week-over-week history exists.
+ *
+ * `recentFullSessions` + `referenceDate` are optional: pass every full_session
+ * row for these players (any session, any date) plus the date to treat as
+ * "today" to also get the low-speed-exposure flag below — omit both to skip it.
  */
 export function computeSessionAlerts(
   fullSessionSegs: DrillSegment[],
   rpeEntries: RpeEntry[],
   settings: AppSettings,
+  recentFullSessions: DatedFullSession[] = [],
+  referenceDate?: string,
 ): AlertFlag[] {
   const flags: AlertFlag[] = []
   const { maxSpeedDeficitPct, highMechWorkRelative, highVolumeRelative, highSRpeRelative } = settings.alertThresholds
@@ -74,6 +95,30 @@ export function computeSessionAlerts(
           type: 'high-srpe',
           severity: 'warning',
           message: `sRPE ${entry.sRpe.toFixed(0)} — ${Math.round(((entry.sRpe - sRpeMedian) / sRpeMedian) * 100)}% sopra la mediana squadra (${sRpeMedian.toFixed(0)}).`,
+        })
+      }
+    }
+  }
+
+  if (referenceDate) {
+    const windowStart = isoDateMinusDays(referenceDate, SPEED_EXPOSURE_WINDOW_DAYS - 1)
+    // Only rows with a real (>0) %MaxSpeed reading count — a missing/uncoded
+    // value must never be read as "0% exposure" and turned into a fabricated flag.
+    const peakPctByPlayer = new Map<string, number>()
+    for (const { seg, date } of recentFullSessions) {
+      if (date < windowStart || date > referenceDate || seg.pctMaxSpeed <= 0) continue
+      const peak = peakPctByPlayer.get(seg.playerId) ?? 0
+      if (seg.pctMaxSpeed > peak) peakPctByPlayer.set(seg.playerId, seg.pctMaxSpeed)
+    }
+
+    for (const seg of fullSessionSegs) {
+      const peak = peakPctByPlayer.get(seg.playerId)
+      if (peak !== undefined && peak < SPEED_EXPOSURE_PCT_THRESHOLD) {
+        flags.push({
+          playerId: seg.playerId,
+          type: 'low-speed-exposure',
+          severity: 'serious',
+          message: `Negli ultimi ${SPEED_EXPOSURE_WINDOW_DAYS} giorni non ha mai superato il ${SPEED_EXPOSURE_PCT_THRESHOLD}% della propria velocità massima (picco: ${peak.toFixed(0)}%).`,
         })
       }
     }

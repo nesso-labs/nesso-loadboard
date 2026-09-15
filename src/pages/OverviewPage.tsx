@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
-import { computeSessionAlerts, type AlertSeverity } from '../lib/metrics/alerts'
+import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
@@ -65,7 +65,12 @@ export function OverviewPage() {
   const avgHsr = fullSessionRows.length > 0 ? totalHsr / fullSessionRows.length : 0
   const maxSpeed = Math.max(0, ...activeSegments.map((s) => s.maxSpeedKmh))
   const activeRpe = rpe.filter((r) => activePlayerIds.has(r.playerId))
-  const flags = settings ? computeSessionAlerts(fullSessionRows, activeRpe, settings) : []
+  const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
+  const recentFullSessions: DatedFullSession[] = allSegments
+    .filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
+  const flags =
+    settings && currentSession ? computeSessionAlerts(fullSessionRows, activeRpe, settings, recentFullSessions, currentSession.date) : []
   const microMetricDef = MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? MICROCYCLE_METRICS[0]
   const microcycleByPlayer = settings
     ? activePlayers
