@@ -4,7 +4,7 @@ import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
 import { mean } from '../lib/utils'
-import { useAllSegmentsQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import {
   MATCH_LOCATION_LABEL,
   MATCH_RESULT_LABEL,
@@ -42,7 +42,8 @@ function MatchBadge({ session }: { session: Session }) {
 
 export function GameVGamePage() {
   const { data: sessions = [] } = useSessionsQuery()
-  const { data: segments = [], isLoading } = useAllSegmentsQuery()
+  const { data: rawSegments = [], isLoading } = useAllSegmentsQuery()
+  const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
   const [matchAId, setMatchAId] = useState<string | undefined>(undefined)
   const [matchBId, setMatchBId] = useState<string | undefined>(undefined)
@@ -54,6 +55,10 @@ export function GameVGamePage() {
   )
 
   if (isLoading || !settings) return null
+
+  // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
+  const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
+  const segments = rawSegments.filter((s) => activePlayerIds.has(s.playerId))
 
   if (matchSessions.length === 0) {
     return (

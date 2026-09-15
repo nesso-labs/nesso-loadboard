@@ -29,6 +29,7 @@ export function LeaderboardPage() {
   if (!currentSession || isLoading || !settings) return null
 
   const playerById = new Map(players.map((p) => [p.id, p]))
+  const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
 
   const metrics: MetricSpec[] = [
     { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM, aggregate: 'sum' },
@@ -45,7 +46,9 @@ export function LeaderboardPage() {
       ? new Set([currentSession.id])
       : new Set(sessions.filter((s) => isoWeek(s.date) === isoWeek(currentSession.date)).map((s) => s.id))
 
-  const scopedSegs = segments.filter((s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId))
+  const scopedSegs = segments.filter(
+    (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
+  )
 
   if (scopedSegs.length === 0) {
     return (

@@ -52,17 +52,20 @@ export function OverviewPage() {
     )
   }
 
-  const fullSessionRows = segments.filter((s) => s.segmentKind === 'full_session')
-  const playerCount = new Set(segments.map((s) => s.playerId)).size
+  const playerById = new Map(players.map((p) => [p.id, p]))
+  const activePlayers = players.filter((p) => p.active)
+  const activePlayerIds = new Set(activePlayers.map((p) => p.id))
+
+  const activeSegments = segments.filter((s) => activePlayerIds.has(s.playerId))
+  const fullSessionRows = activeSegments.filter((s) => s.segmentKind === 'full_session')
+  const playerCount = new Set(activeSegments.map((s) => s.playerId)).size
   const totalDistance = fullSessionRows.reduce((sum, s) => sum + s.totalDistanceM, 0)
   const avgDistance = fullSessionRows.length > 0 ? totalDistance / fullSessionRows.length : 0
   const totalHsr = fullSessionRows.reduce((sum, s) => sum + s.hsrM, 0)
   const avgHsr = fullSessionRows.length > 0 ? totalHsr / fullSessionRows.length : 0
-  const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
-  const playerById = new Map(players.map((p) => [p.id, p]))
-  const flags = settings ? computeSessionAlerts(fullSessionRows, rpe, settings) : []
-
-  const activePlayers = players.filter((p) => p.active)
+  const maxSpeed = Math.max(0, ...activeSegments.map((s) => s.maxSpeedKmh))
+  const activeRpe = rpe.filter((r) => activePlayerIds.has(r.playerId))
+  const flags = settings ? computeSessionAlerts(fullSessionRows, activeRpe, settings) : []
   const microMetricDef = MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? MICROCYCLE_METRICS[0]
   const microcycleByPlayer = settings
     ? activePlayers

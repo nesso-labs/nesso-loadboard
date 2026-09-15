@@ -27,6 +27,7 @@ export function WeeklyRunningPage() {
   const [selectedWeek, setSelectedWeek] = useState<string | undefined>(undefined)
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
 
   if (loadingSessions || loadingSegments || !settings) return null
 
@@ -43,7 +44,9 @@ export function WeeklyRunningPage() {
   const weeks = [...new Set(sessions.map((s) => isoWeek(s.date)))].sort().reverse()
   const activeWeek = selectedWeek ?? weeks[0]
   const sessionIdsInWeek = new Set(sessions.filter((s) => isoWeek(s.date) === activeWeek).map((s) => s.id))
-  const weekSegments = segments.filter((s) => s.segmentKind === 'full_session' && sessionIdsInWeek.has(s.sessionId))
+  const weekSegments = segments.filter(
+    (s) => s.segmentKind === 'full_session' && sessionIdsInWeek.has(s.sessionId) && activePlayerIds.has(s.playerId),
+  )
 
   if (weekSegments.length === 0) {
     return (

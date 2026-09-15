@@ -55,9 +55,9 @@ function SessionRow({ session }: { session: Session }) {
   const [rpeError, setRpeError] = useState<string | null>(null)
 
   const playerById = new Map(players.map((p) => [p.id, p]))
-  const involvedPlayerIds = [...new Set(segments.map((s) => s.playerId))].sort((a, b) =>
-    (playerById.get(a)?.displayName ?? a).localeCompare(playerById.get(b)?.displayName ?? b),
-  )
+  const involvedPlayerIds = [...new Set(segments.map((s) => s.playerId))]
+    .filter((id) => playerById.get(id)?.active !== false)
+    .sort((a, b) => (playerById.get(a)?.displayName ?? a).localeCompare(playerById.get(b)?.displayName ?? b))
 
   function toggleEdit() {
     if (panel !== 'edit') {

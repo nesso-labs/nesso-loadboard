@@ -25,10 +25,11 @@ export function AlertsPage() {
   const { data: players = [] } = usePlayersQuery()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
+  const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
 
   if (!currentSession || loadingSegments || !settings) return null
 
-  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session')
+  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId))
 
   if (fullSessionSegs.length === 0) {
     return (
