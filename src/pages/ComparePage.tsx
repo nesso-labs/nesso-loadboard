@@ -13,7 +13,7 @@ import {
 import { median, percentileRank } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { usePlayersQuery, useSegmentsBySessionQuery, useSettingsQuery } from '../state/queries'
-import type { DrillSegment } from '../types/domain'
+import { TRAINING_TYPE_LABEL, type DrillSegment } from '../types/domain'
 
 const PLAYER_COLORS = ['var(--color-series-blue)', 'var(--color-series-orange)', 'var(--color-series-aqua)']
 const MAX_PLAYERS = 3
@@ -93,6 +93,16 @@ export function ComparePage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-sm text-ink-secondary">
+        Sessione: <span className="font-medium text-ink">{currentSession.label}</span> —{' '}
+        <span className="tabular-nums">{currentSession.date}</span> —{' '}
+        {currentSession.type === 'match'
+          ? 'Partita'
+          : currentSession.trainingType
+            ? `Allenamento (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
+            : 'Allenamento (non classificato)'}
+      </p>
+
       <div>
         <p className="mb-2 text-sm font-medium text-ink-secondary">Scegli fino a {MAX_PLAYERS} giocatori</p>
         <div className="flex flex-wrap gap-2">
