@@ -130,7 +130,7 @@ export async function buildSegmentsForSession(
       id: `${sessionId}:${playerId}:full-session-synth`,
       sessionId,
       playerId,
-      drillTitle: sessionType === 'match' ? 'Full Match (stimata)' : 'Full Session (stimata)',
+      drillTitle: sessionType === 'match' ? 'Full Match' : 'Full Session (stimata)',
       segmentKind: 'full_session',
       durationSec: sum((s) => s.durationSec),
       totalDistanceM: sum((s) => s.totalDistanceM),
