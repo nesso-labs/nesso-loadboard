@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, Printer, Upload } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Printer, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useCurrentSession } from '../../state/CurrentSessionContext'
@@ -82,6 +82,17 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
           <Upload className="size-3.5" />
           <span className="hidden sm:inline">Importa sessione</span>
         </Link>
+
+        <form method="POST" action="/api/auth/logout" className="shrink-0">
+          <button
+            type="submit"
+            aria-label="Esci"
+            className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:bg-ink/5 sm:px-3"
+          >
+            <LogOut className="size-3.5" />
+            <span className="hidden sm:inline">Esci</span>
+          </button>
+        </form>
       </div>
     </header>
   )

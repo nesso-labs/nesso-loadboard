@@ -2,6 +2,10 @@ import type { DrillSegment, Player, RpeEntry, Session } from '../../src/types/do
 
 export interface Env {
   DB: D1Database
+  /** Site-wide gate password. Provisioned as a Cloudflare Pages secret
+   *  (terraform/cloudflare/pages-nesso-loadboard.tf in nesso-infra) —
+   *  never a literal in this repo. Absent means the site refuses to serve. */
+  SITE_PASSWORD: string
 }
 
 // --- sessions ---
