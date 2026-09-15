@@ -6,6 +6,8 @@ interface ComparisonBarProps {
   referenceLabel: string
   referenceValue: number
   format?: (value: number) => string
+  /** Shows the primary bar as a % of the reference bar (blue vs orange), next to the label. */
+  showRatio?: boolean
 }
 
 /** Two horizontal bars (this session vs a reference) sharing one scale — one hue each, so the pair reads at a glance without relying on the text labels alone. */
@@ -17,14 +19,21 @@ export function ComparisonBar({
   referenceLabel,
   referenceValue,
   format = (v) => v.toFixed(0),
+  showRatio = false,
 }: ComparisonBarProps) {
   const max = Math.max(primaryValue, referenceValue, 1)
+  const ratioPct = referenceValue > 0 ? (primaryValue / referenceValue) * 100 : null
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium text-ink-secondary">
-        {label}
-        {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
+      <p className="flex items-center justify-between text-sm font-medium text-ink-secondary">
+        <span>
+          {label}
+          {unit && <span className="ml-1 text-ink-muted">({unit})</span>}
+        </span>
+        {showRatio && (
+          <span className="text-xs font-semibold text-ink">{ratioPct !== null ? `${ratioPct.toFixed(0)}%` : '—'}</span>
+        )}
       </p>
       <Bar
         label={primaryLabel}

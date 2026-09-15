@@ -227,6 +227,7 @@ export function SessionVGamePage() {
                 primaryValue={mean(trainingFullSegs.map(m.volume))}
                 referenceLabel="Gara"
                 referenceValue={m.key in gamePerformanceModel ? gamePerformanceModel[m.key] : mean(playerGameSegs.map(m.volume))}
+                showRatio
               />
             ))}
           </div>
@@ -247,6 +248,7 @@ export function SessionVGamePage() {
                   referenceLabel="Gara"
                   referenceValue={mean(playerGameSegs.map(perMin))}
                   format={(v) => v.toFixed(1)}
+                  showRatio
                 />
               )
             })}
@@ -258,6 +260,7 @@ export function SessionVGamePage() {
               referenceLabel="Gara"
               referenceValue={mean(playerGameSegs.map((s) => mechanicalWorkPerMin(s, settings)))}
               format={(v) => v.toFixed(2)}
+              showRatio
             />
           </div>
 
@@ -278,6 +281,7 @@ export function SessionVGamePage() {
                 primaryValue={postMatchSum(m.volume)}
                 referenceLabel="Target"
                 referenceValue={gamePerformanceModel[m.key] * TARGET_MULTIPLIER[m.key]}
+                showRatio
               />
             ))}
           </div>
