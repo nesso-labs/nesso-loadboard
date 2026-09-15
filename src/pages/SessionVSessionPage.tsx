@@ -84,13 +84,23 @@ export function SessionVSessionPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-secondary">
-          Confronto tra questa sessione e lo storico dello stesso giocatore
-          {currentSession.type === 'training' && currentSession.trainingType
-            ? ` su allenamenti dello stesso tipo (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
-            : ` su sessioni dello stesso tipo (${currentSession.type === 'match' ? 'partita' : 'allenamento'})`}
-          . Servono almeno {MIN_COMPARABLE_SESSIONS} sessioni storiche per giocatore per un confronto affidabile.
-        </p>
+        <div className="flex flex-col gap-1">
+          {currentSession.type === 'training' && (
+            <p className="text-sm text-ink-secondary">
+              Tipo di allenamento:{' '}
+              <span className="font-medium text-ink">
+                {currentSession.trainingType ? TRAINING_TYPE_LABEL[currentSession.trainingType] : 'Non classificato'}
+              </span>
+            </p>
+          )}
+          <p className="text-sm text-ink-secondary">
+            Confronto tra questa sessione e lo storico dello stesso giocatore
+            {currentSession.type === 'training' && currentSession.trainingType
+              ? ` su allenamenti dello stesso tipo (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
+              : ` su sessioni dello stesso tipo (${currentSession.type === 'match' ? 'partita' : 'allenamento'})`}
+            . Servono almeno {MIN_COMPARABLE_SESSIONS} sessioni storiche per giocatore per un confronto affidabile.
+          </p>
+        </div>
         {currentSession.type === 'training' && currentSession.trainingType && (
           <label className="flex shrink-0 items-center gap-1.5 text-xs text-ink-secondary">
             <input
