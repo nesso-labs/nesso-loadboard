@@ -1,7 +1,7 @@
 import { BarChart3 } from 'lucide-react'
 import { MetricTrendPanel } from '../components/charts/MetricTrendPanel'
+import { MicrocycleBarChart, type MicrocycleBarChartGroup } from '../components/charts/MicrocycleBarChart'
 import { EmptyState } from '../components/ui/EmptyState'
-import { HeatmapTable, type HeatmapColumn, type HeatmapGroup } from '../components/ui/HeatmapTable'
 import { distanceAbove19_8, distanceAbove25_2, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { rollingAverageByDateWindow } from '../lib/metrics/timeSeries'
@@ -21,7 +21,7 @@ const POSITION_LABEL: Record<Position, string> = {
 interface MicrocycleRow {
   player: Player
   sessionsSinceLastMatch: number
-  pctByMetricKey: Record<string, number | null>
+  metrics: { key: string; label: string; pct: number | null; lowSample: boolean }[]
 }
 
 export function DynamicLoadPage() {
@@ -93,33 +93,14 @@ export function DynamicLoadPage() {
   const activePlayers = players.filter((p) => p.active)
   const microcycleRows: MicrocycleRow[] = activePlayers.map((player) => {
     const playerSegments = segments.filter((s) => s.playerId === player.id)
-    const pctByMetricKey: Record<string, number | null> = {}
     let sessionsSinceLastMatch = 0
-    trackedMicrocycleMetrics.forEach((def, i) => {
+    const metrics = trackedMicrocycleMetrics.map((def, i) => {
       const result = computeMicrocycleCompletion(player.id, sessions, playerSegments, (s) => def.metric(s, settings))
-      pctByMetricKey[def.key] = result.pct
       if (i === 0) sessionsSinceLastMatch = result.sessionsSinceLastMatch
+      return { key: def.key, label: shortMetricLabel[def.key] ?? def.label, pct: result.pct, lowSample: result.lowSample }
     })
-    return { player, sessionsSinceLastMatch, pctByMetricKey }
+    return { player, sessionsSinceLastMatch, metrics }
   })
-
-  const microcycleColumns: HeatmapColumn<MicrocycleRow>[] = [
-    {
-      key: 'sessionsSinceLastMatch',
-      label: 'Sedute da ultima gara',
-      getValue: (r) => r.sessionsSinceLastMatch,
-      format: (v) => v.toFixed(0),
-    },
-    ...trackedMicrocycleMetrics.map(
-      (def): HeatmapColumn<MicrocycleRow> => ({
-        key: def.key,
-        label: shortMetricLabel[def.key] ?? def.label,
-        unit: '%',
-        getValue: (r) => r.pctByMetricKey[def.key],
-        format: (v) => v.toFixed(0),
-      }),
-    ),
-  ]
 
   const microcycleGroupsByPosition = new Map<Position, MicrocycleRow[]>()
   for (const row of microcycleRows) {
@@ -127,11 +108,13 @@ export function DynamicLoadPage() {
     list.push(row)
     microcycleGroupsByPosition.set(row.player.position, list)
   }
-  const microcycleGroups: HeatmapGroup<MicrocycleRow>[] = POSITION_ORDER.filter((pos) =>
+  const microcycleGroups: MicrocycleBarChartGroup[] = POSITION_ORDER.filter((pos) =>
     microcycleGroupsByPosition.has(pos),
   ).map((pos) => ({
     label: POSITION_LABEL[pos],
-    rows: microcycleGroupsByPosition.get(pos)!.sort((a, b) => a.player.displayName.localeCompare(b.player.displayName)),
+    players: microcycleGroupsByPosition
+      .get(pos)!
+      .sort((a, b) => a.player.displayName.localeCompare(b.player.displayName)),
   }))
 
   return (
@@ -171,13 +154,7 @@ export function DynamicLoadPage() {
             Per giocatore: allenamenti svolti dall'ultima partita a oggi, e ogni metrica di carico come % rispetto a
             un microciclo tipo storico (Ripresa + Forza + Metabolico + Rifinitura).
           </p>
-          <HeatmapTable
-            columns={microcycleColumns}
-            groups={microcycleGroups}
-            getRowKey={(r) => r.player.id}
-            getRowLabel={(r) => r.player.displayName}
-            compact
-          />
+          <MicrocycleBarChart groups={microcycleGroups} />
         </div>
       )}
     </div>
