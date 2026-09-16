@@ -43,6 +43,7 @@ export interface SessionMetadataInput {
   trainingType?: TrainingType
   matchResult?: MatchResult
   matchLocation?: MatchLocation
+  opponentName?: string
 }
 
 export interface StagedImport {
@@ -86,6 +87,7 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
     trainingType: staged.metadata.type === 'training' ? staged.metadata.trainingType : undefined,
     matchResult: staged.metadata.type === 'match' ? staged.metadata.matchResult : undefined,
     matchLocation: staged.metadata.type === 'match' ? staged.metadata.matchLocation : undefined,
+    opponentName: staged.metadata.type === 'match' ? staged.metadata.opponentName : undefined,
     importedAt: now,
     sourceFileName: staged.sourceFileName,
     rawRowCount: staged.rawRowCount,

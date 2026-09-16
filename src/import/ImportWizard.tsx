@@ -4,6 +4,7 @@ import { CsvImportError } from '../lib/csv/parseSessionCsv'
 import { commitImport, stageImport, type StagedImport } from '../lib/csv/importSession'
 import { listPlayers } from '../lib/db/repo'
 import {
+  buildMatchLabel,
   MATCH_LOCATION_LABEL,
   MATCH_RESULT_LABEL,
   TRAINING_TYPE_LABEL,
@@ -47,6 +48,8 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   const [trainingType, setTrainingType] = useState<TrainingType>('mix')
   const [matchResult, setMatchResult] = useState<MatchResult>('win')
   const [matchLocation, setMatchLocation] = useState<MatchLocation>('home')
+  const [opponentName, setOpponentName] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
   const [staged, setStaged] = useState<StagedImport | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [rpeByPlayerId, setRpeByPlayerId] = useState<Record<string, number>>({})
@@ -68,14 +71,20 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
   }
 
   async function handleMetadataSubmit() {
+    if (type === 'match' && !opponentName.trim()) {
+      setFormError("Inserisci il nome dell'avversario.")
+      return
+    }
+    setFormError(null)
     try {
       const result = await stageImport(fileText, fileName, {
         date,
-        label: label || fileName,
+        label: type === 'match' ? buildMatchLabel(opponentName, matchLocation) : label || fileName,
         type,
         trainingType: type === 'training' ? trainingType : undefined,
         matchResult: type === 'match' ? matchResult : undefined,
         matchLocation: type === 'match' ? matchLocation : undefined,
+        opponentName: type === 'match' ? opponentName.trim() : undefined,
       })
       setStaged(result)
       const allPlayers = await listPlayers()
@@ -131,16 +140,18 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
               className="rounded-md border border-border bg-page px-3 py-2 text-ink"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-ink">Etichetta</span>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="es. Allenamento martedì, Amichevole vs..."
-              className="rounded-md border border-border bg-page px-3 py-2 text-ink"
-            />
-          </label>
+          {type === 'training' && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-ink">Etichetta</span>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="es. Allenamento martedì"
+                className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+              />
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-ink">Tipo</span>
             <select
@@ -174,6 +185,22 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
           {type === 'match' && (
             <>
               <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-ink">Avversario</span>
+                <input
+                  type="text"
+                  value={opponentName}
+                  onChange={(e) => setOpponentName(e.target.value)}
+                  placeholder="es. Juventus"
+                  className="rounded-md border border-border bg-page px-3 py-2 text-ink"
+                />
+                <span className="text-xs text-ink-muted">
+                  Etichetta generata:{' '}
+                  <span className="font-medium text-ink">
+                    {opponentName.trim() ? buildMatchLabel(opponentName, matchLocation) : '—'}
+                  </span>
+                </span>
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium text-ink">Esito</span>
                 <select
                   value={matchResult}
@@ -206,6 +233,7 @@ export function ImportWizard({ onClose }: ImportWizardProps) {
               </label>
             </>
           )}
+          {formError && <p className="text-sm text-status-critical">{formError}</p>}
           <div className="flex justify-between pt-2">
             <button
               type="button"

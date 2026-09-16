@@ -15,6 +15,7 @@ import {
   useSessionsQuery,
 } from '../state/queries'
 import {
+  buildMatchLabel,
   MATCH_LOCATION_LABEL,
   MATCH_RESULT_LABEL,
   TRAINING_TYPE_LABEL,
@@ -46,6 +47,7 @@ function SessionRow({ session }: { session: Session }) {
   const [trainingType, setTrainingType] = useState<TrainingType>(session.trainingType ?? 'mix')
   const [matchResult, setMatchResult] = useState<MatchResult>(session.matchResult ?? 'win')
   const [matchLocation, setMatchLocation] = useState<MatchLocation>(session.matchLocation ?? 'home')
+  const [opponentName, setOpponentName] = useState(session.opponentName ?? '')
   const [savingMeta, setSavingMeta] = useState(false)
   const [metaError, setMetaError] = useState<string | null>(null)
 
@@ -65,6 +67,7 @@ function SessionRow({ session }: { session: Session }) {
       setTrainingType(session.trainingType ?? 'mix')
       setMatchResult(session.matchResult ?? 'win')
       setMatchLocation(session.matchLocation ?? 'home')
+      setOpponentName(session.opponentName ?? '')
     }
     setPanel(panel === 'edit' ? 'none' : 'edit')
   }
@@ -80,12 +83,17 @@ function SessionRow({ session }: { session: Session }) {
     setSavingMeta(true)
     setMetaError(null)
     try {
+      const trimmedOpponent = opponentName.trim()
       const updated: Session = {
         ...session,
         type,
         trainingType: type === 'training' ? trainingType : undefined,
         matchResult: type === 'match' ? matchResult : undefined,
         matchLocation: type === 'match' ? matchLocation : undefined,
+        opponentName: type === 'match' ? trimmedOpponent || undefined : undefined,
+        // Only re-derive the label when there's an opponent to build it from —
+        // never blanks out a pre-existing label for matches imported before this field existed.
+        label: type === 'match' && trimmedOpponent ? buildMatchLabel(trimmedOpponent, matchLocation) : session.label,
       }
       await putSession(updated)
       invalidateMetadata()
@@ -225,6 +233,16 @@ function SessionRow({ session }: { session: Session }) {
               )}
               {type === 'match' && (
                 <>
+                  <label className="flex flex-col gap-1 text-xs">
+                    <span className="font-medium text-ink-secondary">Avversario</span>
+                    <input
+                      type="text"
+                      value={opponentName}
+                      onChange={(e) => setOpponentName(e.target.value)}
+                      placeholder="es. Juventus"
+                      className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                    />
+                  </label>
                   <label className="flex flex-col gap-1 text-xs">
                     <span className="font-medium text-ink-secondary">Esito</span>
                     <select

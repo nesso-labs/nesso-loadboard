@@ -36,6 +36,12 @@ export const MATCH_LOCATION_LABEL: Record<MatchLocation, string> = {
   away_2d: 'Trasferta (2 giorni)',
 }
 
+/** The match session label auto-generated from the opponent + venue — "(Avversario) Trasferta" for away/away_2d, "(Avversario) Casa" for home. */
+export function buildMatchLabel(opponentName: string, location: MatchLocation): string {
+  const suffix = location === 'home' ? 'Casa' : 'Trasferta'
+  return `${opponentName.trim()} ${suffix}`
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string
@@ -89,6 +95,8 @@ export interface Session {
   matchResult?: MatchResult
   /** Only meaningful when type === 'match'. */
   matchLocation?: MatchLocation
+  /** Only meaningful when type === 'match' — drives the auto-generated label via buildMatchLabel. */
+  opponentName?: string
   importedAt: string
   sourceFileName?: string
   rawRowCount: number
