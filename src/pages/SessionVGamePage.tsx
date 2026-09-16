@@ -5,31 +5,18 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/metrics/metricsCatalog'
 import { currentMicrocycleSessions } from '../lib/metrics/microcycle'
 import { performanceModelAverage } from '../lib/metrics/performanceModel'
+import {
+  PERFORMANCE_MODEL_ALPHA,
+  PERFORMANCE_MODEL_METRICS as METRICS,
+  WEEKLY_TARGET_MULTIPLIER as TARGET_MULTIPLIER,
+  type PerformanceModelMetricSpec as MetricSpec,
+} from '../lib/metrics/weeklyPerformanceModel'
 import { mean } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment } from '../types/domain'
 
 const TEAM_ID = '__team__'
-
-interface MetricSpec {
-  key: string
-  label: string
-  unit: string
-  volume: (s: DrillSegment) => number
-}
-
-const METRICS: MetricSpec[] = [
-  { key: 'td', label: 'Distanza totale', unit: 'm', volume: (s) => s.totalDistanceM },
-  { key: 'd198', label: 'Distanza > 19.8 km/h', unit: 'm', volume: distanceAbove19_8 },
-  { key: 'd252', label: 'Distanza > 25.2 km/h', unit: 'm', volume: distanceAbove25_2 },
-]
-
-/** Power-law taper for the 90'-normalization of a match appearance — steeper for high-speed metrics. */
-const PERFORMANCE_MODEL_ALPHA: Record<string, number> = { td: 0.075, d198: 0.12, d252: 0.12 }
-
-/** Post-match training target, as a multiple of the historical performance model. */
-const TARGET_MULTIPLIER: Record<string, number> = { td: 2.5, d198: 1.5, d252: 1.5 }
 
 type ChartKind = 'training-vs-game' | 'intensity' | 'weekly-model'
 

@@ -1,12 +1,16 @@
-import { UserCircle } from 'lucide-react'
+import { ShieldCheck, UserCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { TrendLine } from '../components/charts/TrendLine'
+import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
+import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
 import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
-import { usePlayersQuery, useSegmentsByPlayerQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
+import { useCurrentSession } from '../state/CurrentSessionContext'
+import { useAllSegmentsQuery, usePlayersQuery, useRpeBySessionQuery, useSegmentsByPlayerQuery, useSettingsQuery } from '../state/queries'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
   'valid-cycles': 'vs media dei microcicli storici completi (Ripresa+Forza+Metabolico+Rifinitura)',
@@ -14,10 +18,24 @@ const DENOMINATOR_CAPTION: Record<string, string> = {
   'insufficient-data': 'dati storici insufficienti per un confronto',
 }
 
+const SEVERITY_STYLE: Record<AlertSeverity, string> = {
+  critical: 'bg-status-critical/15 text-status-critical',
+  serious: 'bg-status-serious/20 text-status-serious',
+  warning: 'bg-status-warning/20 text-ink',
+}
+
+const SEVERITY_LABEL: Record<AlertSeverity, string> = {
+  critical: 'Critico',
+  serious: 'Serio',
+  warning: 'Attenzione',
+}
+
 export function PlayerProfilePage() {
   const { data: players = [], isLoading: loadingPlayers } = usePlayersQuery()
-  const { data: sessions = [] } = useSessionsQuery()
+  const { sessions, currentSession } = useCurrentSession()
   const { data: settings } = useSettingsQuery()
+  const { data: allSegments = [] } = useAllSegmentsQuery()
+  const { data: currentSessionRpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
 
   const activeRosterPlayers = useMemo(() => players.filter((p) => p.active), [players])
@@ -55,6 +73,31 @@ export function PlayerProfilePage() {
           def,
           result: computeMicrocycleCompletion(activePlayerId, sessions, segments, (s) => def.metric(s, settings)),
         }))
+      : []
+
+  const matchSessionIds = new Set(sessions.filter((s) => s.type === 'match').map((s) => s.id))
+  const gameSegs = segments.filter((s) => s.segmentKind === 'full_session' && matchSessionIds.has(s.sessionId))
+  const weeklyModelRows =
+    activePlayerId && gameSegs.length > 0 ? computeWeeklyPerformanceModel(segments, gameSegs, sessions) : []
+
+  // Alerts are inherently a per-session concept (team median, 7-day speed-exposure window ending on a
+  // specific date) — this page shows this player's slice of the currently selected session's alerts,
+  // the same ones surfaced on Overview/Alerts, rather than replaying alerts for every past session.
+  const activePlayerIdSet = new Set(activeRosterPlayers.map((p) => p.id))
+  const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
+  const recentFullSessions: DatedFullSession[] = allSegments
+    .filter((s) => s.segmentKind === 'full_session' && activePlayerIdSet.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
+  const currentSessionFullSegs = currentSession
+    ? allSegments.filter(
+        (s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session' && activePlayerIdSet.has(s.playerId),
+      )
+    : []
+  const playerAlerts =
+    activePlayerId && settings && currentSession && currentSessionFullSegs.length > 0
+      ? computeSessionAlerts(currentSessionFullSegs, currentSessionRpe, settings, recentFullSessions, currentSession.date).filter(
+          (f) => f.playerId === activePlayerId,
+        )
       : []
 
   return (
@@ -106,6 +149,33 @@ export function PlayerProfilePage() {
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
 
+          {currentSession && (
+            <div className="panel p-4">
+              <p className="font-display mb-1 text-base font-medium text-ink">Alert — {currentSession.label}</p>
+              <p className="mb-3 text-xs text-ink-muted">
+                Deficit di velocità massima, esposizione a velocità alta negli ultimi 7 giorni e carichi anomali
+                rispetto alla mediana squadra, per la sessione attualmente selezionata.
+              </p>
+              {playerAlerts.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-ink-secondary">
+                  <ShieldCheck className="size-4 text-status-good" />
+                  Nessun alert per {player?.displayName ?? 'questo giocatore'}.
+                </div>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {playerAlerts.map((flag, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_STYLE[flag.severity]}`}>
+                        {SEVERITY_LABEL[flag.severity]}
+                      </span>
+                      <span className="text-ink-secondary">{flag.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {microcycleRows.length > 0 && (
             <div className="panel p-4">
               <p className="font-display mb-1 text-base font-medium text-ink">Completamento microciclo attuale</p>
@@ -133,6 +203,31 @@ export function PlayerProfilePage() {
                   * poche sessioni finora in questo microciclo: percentuale poco affidabile.
                 </p>
               )}
+            </div>
+          )}
+
+          {weeklyModelRows.length > 0 && (
+            <div className="panel p-4">
+              <p className="font-display mb-1 text-base font-medium text-ink">Modello prestativo settimanale</p>
+              <p className="mb-3 text-xs text-ink-muted">
+                Confronta il carico cumulato negli allenamenti svolti dall'ultima partita a oggi contro un target
+                teorico: 2.5x il modello gara per il volume totale, 1.5x per le distanze ad alta velocità. Stessa
+                logica di Session v Game, applicata al solo {player?.displayName ?? 'giocatore'}.
+              </p>
+              <div className="flex flex-col gap-4">
+                {weeklyModelRows.map((row) => (
+                  <ComparisonBar
+                    key={row.key}
+                    label={row.label}
+                    unit={row.unit}
+                    primaryLabel="Post-gara"
+                    primaryValue={row.postMatchValue}
+                    referenceLabel="Target"
+                    referenceValue={row.target}
+                    showRatio
+                  />
+                ))}
+              </div>
             </div>
           )}
 
