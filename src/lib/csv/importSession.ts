@@ -108,19 +108,11 @@ export async function commitImport(staged: StagedImport, rpeByPlayerId: Record<s
   return session
 }
 
-/**
- * Auto-updates a player's recorded max speed when this session beats it — flips pbConfirmed to
- * false so it surfaces on the Data Quality page until a human checks it. Also flips pbConfirmed to
- * false (without touching the stored value) when the vendor's own %MaxSpeed field exceeds 100% for
- * this player in this session — the vendor's internal reference and our confirmed one disagree, even
- * when the raw recorded speed stays below our stored value, so that disagreement needs a human look too.
- */
+/** Auto-updates a player's recorded max speed when this session beats it — flips pbConfirmed to false so it surfaces on the Data Quality page until a human checks it. */
 async function updatePersonalBests(segments: StagedImport['segments']): Promise<void> {
   const maxSpeedByPlayer = new Map<string, number>()
-  const maxVendorPctByPlayer = new Map<string, number>()
   for (const seg of segments) {
     maxSpeedByPlayer.set(seg.playerId, Math.max(maxSpeedByPlayer.get(seg.playerId) ?? 0, seg.maxSpeedKmh))
-    maxVendorPctByPlayer.set(seg.playerId, Math.max(maxVendorPctByPlayer.get(seg.playerId) ?? 0, seg.pctMaxSpeed))
   }
   if (maxSpeedByPlayer.size === 0) return
 
@@ -135,11 +127,6 @@ async function updatePersonalBests(segments: StagedImport['segments']): Promise<
       if (evaluation.status === 'new_record') {
         const updated: Player = { ...player, personalMaxSpeedKmh: sessionMax, pbConfirmed: false }
         await putPlayer(updated)
-        return
-      }
-      const maxVendorPct = maxVendorPctByPlayer.get(playerId) ?? 0
-      if (maxVendorPct > 100 && player.pbConfirmed) {
-        await putPlayer({ ...player, pbConfirmed: false })
       }
     }),
   )

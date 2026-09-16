@@ -1,6 +1,6 @@
 import type { DrillSegment, Player } from '../../types/domain'
 
-export type PbStatus = 'ok' | 'unconfirmed' | 'implausible' | 'new_record' | 'vendor_mismatch'
+export type PbStatus = 'ok' | 'unconfirmed' | 'implausible' | 'new_record'
 
 export interface PbEvaluation {
   status: PbStatus
@@ -17,11 +17,7 @@ export const PB_PLAUSIBILITY_CEILING_KMH = 36.5
  * pattern: every %-of-personal-max reading that depends on this value should
  * be hidden/flagged while it's unconfirmed, not presented as if validated.
  */
-export function evaluatePlayerPb(
-  player: Player,
-  sessionMaxSpeedKmh: number,
-  maxVendorPctInSession?: number,
-): PbEvaluation {
+export function evaluatePlayerPb(player: Player, sessionMaxSpeedKmh: number): PbEvaluation {
   const stored = player.personalMaxSpeedKmh
   if (stored === undefined || sessionMaxSpeedKmh > stored) {
     return {
@@ -39,12 +35,6 @@ export function evaluatePlayerPb(
     }
   }
   if (!player.pbConfirmed) {
-    if (maxVendorPctInSession !== undefined && maxVendorPctInSession > 100) {
-      return {
-        status: 'vendor_mismatch',
-        message: `Il vendor segna ${maxVendorPctInSession.toFixed(0)}% della propria velocità massima di riferimento in questa sessione, pur restando sotto il riferimento confermato dell'app (${stored.toFixed(2)} km/h). I due riferimenti divergono: verificare quale sia corretto.`,
-      }
-    }
     return { status: 'unconfirmed', message: 'Riferimento di velocità massima non ancora confermato.' }
   }
   return { status: 'ok', message: 'Riferimento confermato.' }

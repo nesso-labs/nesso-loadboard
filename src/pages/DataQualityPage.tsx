@@ -13,7 +13,6 @@ const PB_STATUS_STYLE: Record<PbStatus, string> = {
   new_record: 'bg-status-warning/20 text-ink',
   implausible: 'bg-status-critical/15 text-status-critical',
   unconfirmed: 'bg-status-warning/20 text-ink',
-  vendor_mismatch: 'bg-status-warning/20 text-ink',
 }
 
 const PB_STATUS_LABEL: Record<PbStatus, string> = {
@@ -21,7 +20,6 @@ const PB_STATUS_LABEL: Record<PbStatus, string> = {
   new_record: 'Nuovo record — da confermare',
   implausible: 'Implausibile — da verificare',
   unconfirmed: 'Da confermare',
-  vendor_mismatch: 'Vendor oltre il 100% — da confermare',
 }
 
 export function DataQualityPage() {
@@ -54,8 +52,7 @@ export function DataQualityPage() {
     .map((p) => {
       const sessionSegs = segments.filter((s) => s.playerId === p.id)
       const sessionMax = Math.max(0, ...sessionSegs.map((s) => s.maxSpeedKmh))
-      const maxVendorPct = Math.max(0, ...sessionSegs.map((s) => s.pctMaxSpeed))
-      return { player: p, evaluation: evaluatePlayerPb(p, sessionMax, maxVendorPct) }
+      return { player: p, evaluation: evaluatePlayerPb(p, sessionMax) }
     })
     .filter((f) => f.evaluation.status !== 'ok')
 

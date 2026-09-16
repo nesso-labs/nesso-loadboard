@@ -12,6 +12,7 @@ import {
   distanceAbove25_2,
   mechanicalWork,
   mechanicalWorkPerMin,
+  pctOfPersonalBest,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
@@ -74,7 +75,13 @@ export function DrillsPage() {
       getValue: (s) => mechanicalWorkPerMin(s, settings),
       format: (v) => v.toFixed(2),
     },
-    { key: 'pctmax', label: '% Vmax', unit: '%', getValue: (s) => s.pctMaxSpeed, format: (v) => v.toFixed(0) },
+    {
+      key: 'pctmax',
+      label: '% Vmax',
+      unit: '%',
+      getValue: (s) => pctOfPersonalBest(s, playerById.get(s.playerId)?.personalMaxSpeedKmh),
+      format: (v) => v.toFixed(0),
+    },
   ]
 
   const groupsByPosition = new Map<Position, DrillSegment[]>()

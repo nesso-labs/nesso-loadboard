@@ -70,6 +70,12 @@ export function maxSpeedVacancyVsPersonalBestPct(segment: DrillSegment, personal
   return 100 * (1 - segment.maxSpeedKmh / personalMaxSpeedKmh)
 }
 
+/** % of this player's own recorded max-speed reference (Roster & Positions) reached in this segment. Null when the profile has no personal best on file. */
+export function pctOfPersonalBest(segment: DrillSegment, personalMaxSpeedKmh?: number): number | null {
+  if (!personalMaxSpeedKmh || personalMaxSpeedKmh <= 0) return null
+  return 100 * (segment.maxSpeedKmh / personalMaxSpeedKmh)
+}
+
 /**
  * Approximate distance-based work:rest proxy — NOT a true time-based
  * work:rest ratio (that needs a raw positional trace this CSV doesn't have).
