@@ -172,7 +172,7 @@ export function OverviewPage() {
             Rifinitura), da giocatore attivo con dati sufficienti.
           </p>
           <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-            {microcycleByPlayer.slice(0, 12).map(({ player, result }) => (
+            {microcycleByPlayer.map(({ player, result }) => (
               <div key={player.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
                 <span className="truncate text-ink-secondary">{player.displayName}</span>
                 <span className="shrink-0 tabular-nums text-ink">
@@ -181,9 +181,6 @@ export function OverviewPage() {
               </div>
             ))}
           </div>
-          {microcycleByPlayer.length > 12 && (
-            <p className="mt-2 text-xs text-ink-muted">+ altri {microcycleByPlayer.length - 12} giocatori</p>
-          )}
         </div>
       )}
     </div>
