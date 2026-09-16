@@ -148,6 +148,12 @@ export function LeaderboardPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="rounded-md border border-border bg-surface p-3 text-sm text-ink-secondary">
+        Classifica dei giocatori attivi in base alla metrica scelta, calcolata sul periodo e sul tipo di sessione
+        selezionati. Usa i filtri qui sotto per cambiare metrica, intervallo di date e Allenamenti/Partite/Entrambi.
+        Lo scatterplot in fondo mette a confronto due variabili a scelta (anche altezza e peso) per individuare
+        relazioni tra i giocatori.
+      </div>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-ink-secondary">Metrica</span>
