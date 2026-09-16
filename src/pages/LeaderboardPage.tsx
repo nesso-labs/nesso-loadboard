@@ -1,11 +1,20 @@
 import { Trophy } from 'lucide-react'
 import { useState } from 'react'
+import { PlayerScatterChart, type ScatterPoint } from '../components/charts/PlayerScatterChart'
 import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import type { DrillSegment } from '../types/domain'
+import type { DrillSegment, SessionType } from '../types/domain'
+
+type TypeFilter = SessionType | 'all'
+
+const TYPE_FILTER_LABEL: Record<TypeFilter, string> = {
+  all: 'Entrambi',
+  training: 'Allenamenti',
+  match: 'Partite',
+}
 
 interface MetricSpec {
   key: string
@@ -13,6 +22,27 @@ interface MetricSpec {
   unit: string
   getValue: (s: DrillSegment) => number
   aggregate: 'sum' | 'max'
+}
+
+interface ScatterVarSpec {
+  key: string
+  label: string
+  unit: string
+  values: Map<string, number>
+}
+
+function aggregateByPlayer(segs: DrillSegment[], spec: Pick<MetricSpec, 'getValue' | 'aggregate'>): Map<string, number> {
+  const byPlayer = new Map<string, number[]>()
+  for (const seg of segs) {
+    const list = byPlayer.get(seg.playerId) ?? []
+    list.push(spec.getValue(seg))
+    byPlayer.set(seg.playerId, list)
+  }
+  const result = new Map<string, number>()
+  for (const [playerId, values] of byPlayer) {
+    result.set(playerId, spec.aggregate === 'sum' ? values.reduce((a, b) => a + b, 0) : Math.max(...values))
+  }
+  return result
 }
 
 export function LeaderboardPage() {
@@ -26,6 +56,9 @@ export function LeaderboardPage() {
   // so the default view still shows a single day (that session) rather than the whole history.
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [xVarKey, setXVarKey] = useState('td')
+  const [yVarKey, setYVarKey] = useState('vmax')
 
   if (!currentSession || isLoading || !settings) return null
 
@@ -46,7 +79,10 @@ export function LeaderboardPage() {
   const effectiveEnd = endDate || currentSession.date
 
   const scopeSessionIds = new Set(
-    sessions.filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd).map((s) => s.id),
+    sessions
+      .filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd)
+      .filter((s) => typeFilter === 'all' || s.type === typeFilter)
+      .map((s) => s.id),
   )
 
   const scopedSegs = segments.filter(
@@ -81,6 +117,35 @@ export function LeaderboardPage() {
 
   const maxValue = Math.max(...rows.map((r) => r.value), 1)
 
+  const activePlayers = players.filter((p) => p.active)
+
+  // GPS-derived variables reuse the same period/mode-scoped segments as the leaderboard bars above;
+  // anagraphic ones (height/weight) are constant per player, so the selected period doesn't apply to them.
+  const scatterVariables: ScatterVarSpec[] = [
+    ...metrics.map((m) => ({ key: m.key, label: m.label, unit: m.unit, values: aggregateByPlayer(scopedSegs, m) })),
+    {
+      key: 'height',
+      label: 'Altezza',
+      unit: 'cm',
+      values: new Map(activePlayers.filter((p) => p.heightCm !== undefined).map((p) => [p.id, p.heightCm as number])),
+    },
+    {
+      key: 'weight',
+      label: 'Peso',
+      unit: 'kg',
+      values: new Map(activePlayers.filter((p) => p.weightKg !== undefined).map((p) => [p.id, p.weightKg as number])),
+    },
+  ]
+  const xVar = scatterVariables.find((v) => v.key === xVarKey) ?? scatterVariables[0]
+  const yVar = scatterVariables.find((v) => v.key === yVarKey) ?? scatterVariables[1]
+
+  const scatterPoints: ScatterPoint[] = activePlayers.flatMap((p) => {
+    const x = xVar.values.get(p.id)
+    const y = yVar.values.get(p.id)
+    if (x === undefined || y === undefined) return []
+    return [{ playerId: p.id, name: p.displayName, initials: p.displayName.replace(/\s+/g, '').slice(0, 4).toUpperCase(), x, y }]
+  })
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -106,6 +171,18 @@ export function LeaderboardPage() {
             setEndDate(newEnd)
           }}
         />
+        <div className="flex rounded-md border border-border p-0.5 text-sm">
+          {(Object.keys(TYPE_FILTER_LABEL) as TypeFilter[]).map((tf) => (
+            <button
+              key={tf}
+              type="button"
+              onClick={() => setTypeFilter(tf)}
+              className={`rounded px-3 py-1 ${typeFilter === tf ? 'bg-accent text-accent-ink' : 'text-ink-secondary'}`}
+            >
+              {TYPE_FILTER_LABEL[tf]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="panel p-4">
@@ -126,6 +203,53 @@ export function LeaderboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="panel p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="font-display text-base font-medium text-ink">Scatterplot</p>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2">
+              <span className="text-ink-secondary">Asse X</span>
+              <select
+                value={xVarKey}
+                onChange={(e) => setXVarKey(e.target.value)}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+              >
+                {scatterVariables.map((v) => (
+                  <option key={v.key} value={v.key}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="text-ink-secondary">Asse Y</span>
+              <select
+                value={yVarKey}
+                onChange={(e) => setYVarKey(e.target.value)}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+              >
+                {scatterVariables.map((v) => (
+                  <option key={v.key} value={v.key}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+        {scatterPoints.length === 0 ? (
+          <p className="py-10 text-center text-sm text-ink-muted">
+            Dati insufficienti per questo confronto nel periodo e nella modalità selezionati.
+          </p>
+        ) : (
+          <PlayerScatterChart
+            points={scatterPoints}
+            xLabel={`${xVar.label}${xVar.unit ? ` (${xVar.unit})` : ''}`}
+            yLabel={`${yVar.label}${yVar.unit ? ` (${yVar.unit})` : ''}`}
+          />
+        )}
       </div>
     </div>
   )

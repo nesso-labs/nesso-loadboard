@@ -1,0 +1,117 @@
+import { CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
+
+export interface ScatterPoint {
+  playerId: string
+  name: string
+  initials: string
+  x: number
+  y: number
+}
+
+interface PlayerScatterChartProps {
+  points: ScatterPoint[]
+  xLabel: string
+  yLabel: string
+  height?: number
+}
+
+const DOT_RADIUS = 15
+
+function formatValue(v: number): string {
+  return Number.isInteger(v) ? String(v) : v.toFixed(1)
+}
+
+/** One accent-colored dot per player, with initials set directly inside the
+ * mark — identity is legible at a glance without a legend or hover, matching
+ * the "label inside a colored fill" exception (pick ink by the fill's
+ * luminance). A 2px surface ring keeps overlapping dots distinct. */
+function PlayerDot(props: { cx?: number; cy?: number; payload?: ScatterPoint }) {
+  const { cx, cy, payload } = props
+  if (cx === undefined || cy === undefined || !payload) return null
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={DOT_RADIUS} fill="var(--color-accent)" stroke="var(--color-surface)" strokeWidth={2} />
+      <text
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={9}
+        fontWeight={700}
+        fill="var(--color-accent-ink)"
+      >
+        {payload.initials}
+      </text>
+    </g>
+  )
+}
+
+function ScatterTooltip({
+  active,
+  payload,
+  xLabel,
+  yLabel,
+}: {
+  active?: boolean
+  payload?: { payload: ScatterPoint }[]
+  xLabel: string
+  yLabel: string
+}) {
+  if (!active || !payload || payload.length === 0) return null
+  const point = payload[0].payload
+  return (
+    <div
+      style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 10,
+        padding: '6px 10px',
+        fontSize: 12,
+      }}
+    >
+      <div style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{point.name}</div>
+      <div style={{ color: 'var(--color-ink-secondary)' }}>
+        {xLabel}: {formatValue(point.x)}
+      </div>
+      <div style={{ color: 'var(--color-ink-secondary)' }}>
+        {yLabel}: {formatValue(point.y)}
+      </div>
+    </div>
+  )
+}
+
+export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: PlayerScatterChartProps) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ScatterChart margin={{ top: 12, right: 24, bottom: 24, left: 8 }}>
+        <CartesianGrid stroke="var(--color-grid)" strokeDasharray="3 3" />
+        <XAxis
+          type="number"
+          dataKey="x"
+          name={xLabel}
+          padding={{ left: 24, right: 24 }}
+          tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }}
+          axisLine={{ stroke: 'var(--color-baseline)' }}
+          tickLine={false}
+          label={{ value: xLabel, position: 'insideBottom', offset: -16, fill: 'var(--color-ink-secondary)', fontSize: 11 }}
+        />
+        <YAxis
+          type="number"
+          dataKey="y"
+          name={yLabel}
+          padding={{ top: 24, bottom: 24 }}
+          tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }}
+          axisLine={false}
+          tickLine={false}
+          width={56}
+          label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--color-ink-secondary)', fontSize: 11 }}
+        />
+        <Tooltip
+          cursor={{ strokeDasharray: '3 3', stroke: 'var(--color-baseline)' }}
+          content={<ScatterTooltip xLabel={xLabel} yLabel={yLabel} />}
+        />
+        <Scatter data={points} shape={PlayerDot} />
+      </ScatterChart>
+    </ResponsiveContainer>
+  )
+}

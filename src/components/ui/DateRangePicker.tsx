@@ -97,7 +97,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
         onClick={() => (open ? closePicker() : openPicker())}
         className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-ink hover:bg-ink/5"
       >
-        <CalendarRange className="size-4 text-ink-muted" />
+        <CalendarRange className="size-4 text-ink-secondary" />
         <span className="tabular-nums">{formatRangeLabel(startDate, endDate)}</span>
       </button>
 
