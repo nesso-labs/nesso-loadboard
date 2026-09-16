@@ -67,6 +67,8 @@ export function PlayerProfilePage() {
   const avgDistance =
     fullSessionSegs.length > 0 ? fullSessionSegs.reduce((sum, r) => sum + r.segment.totalDistanceM, 0) / fullSessionSegs.length : 0
   const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
+  const maxSpeedSegment = segments.find((s) => s.maxSpeedKmh === maxSpeed)
+  const maxSpeedDate = maxSpeedSegment ? sessionById.get(maxSpeedSegment.sessionId)?.date : undefined
   const microcycleRows =
     activePlayerId && settings
       ? MICROCYCLE_METRICS.map((def) => ({
@@ -145,7 +147,13 @@ export function PlayerProfilePage() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Sessioni" value={String(sessionCount)} />
             <StatTile label="Distanza media" value={formatNumber(avgDistance)} unit="m" />
-            <StatTile label="Vmax storica" value={formatNumber(maxSpeed, 1)} unit="km/h" accent />
+            <StatTile
+              label="Vmax storica"
+              value={formatNumber(maxSpeed, 1)}
+              unit="km/h"
+              accent
+              hint={maxSpeedDate ? `Registrata il ${maxSpeedDate}` : undefined}
+            />
             <StatTile label="Posizione" value={player?.position ?? '—'} />
           </div>
 
