@@ -23,6 +23,17 @@ const SEVERITY_STYLE: Record<AlertSeverity, string> = {
   warning: 'bg-status-warning/20 text-ink',
 }
 
+// Duration isn't a load metric worth tracking for microcycle completion (see
+// DynamicLoadPage's identical exclusion) — not offered as a selectable option here.
+const SELECTABLE_MICROCYCLE_METRICS = MICROCYCLE_METRICS.filter((m) => m.key !== 'duration')
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
 export function OverviewPage() {
   const { sessions, currentSession, isLoading } = useCurrentSession()
   const { data: segments = [] } = useSegmentsBySessionQuery(currentSession?.id)
@@ -30,7 +41,7 @@ export function OverviewPage() {
   const { data: settings } = useSettingsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: allSegments = [] } = useAllSegmentsQuery()
-  const [microMetricKey, setMicroMetricKey] = useState(MICROCYCLE_METRICS[0].key)
+  const [microMetricKey, setMicroMetricKey] = useState(SELECTABLE_MICROCYCLE_METRICS[0].key)
 
   if (isLoading) return null
 
@@ -71,7 +82,8 @@ export function OverviewPage() {
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
   const flags =
     settings && currentSession ? computeSessionAlerts(fullSessionRows, activeRpe, settings, recentFullSessions, currentSession.date) : []
-  const microMetricDef = MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? MICROCYCLE_METRICS[0]
+  const microMetricDef =
+    SELECTABLE_MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? SELECTABLE_MICROCYCLE_METRICS[0]
   const microcycleByPlayer = settings
     ? activePlayers
         .map((p) => ({
@@ -86,10 +98,7 @@ export function OverviewPage() {
         .filter((r) => r.result.pct !== null)
         .sort((a, b) => (a.result.pct ?? 0) - (b.result.pct ?? 0))
     : []
-  const teamAvgMicrocyclePct =
-    microcycleByPlayer.length > 0
-      ? microcycleByPlayer.reduce((sum, r) => sum + (r.result.pct ?? 0), 0) / microcycleByPlayer.length
-      : null
+  const teamMedianMicrocyclePct = median(microcycleByPlayer.map((r) => r.result.pct ?? 0))
 
   return (
     <div className="flex flex-col gap-6">
@@ -152,7 +161,7 @@ export function OverviewPage() {
                 onChange={(e) => setMicroMetricKey(e.target.value)}
                 className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-ink"
               >
-                {MICROCYCLE_METRICS.map((m) => (
+                {SELECTABLE_MICROCYCLE_METRICS.map((m) => (
                   <option key={m.key} value={m.key}>
                     {m.label}
                   </option>
@@ -164,9 +173,9 @@ export function OverviewPage() {
             </div>
           </div>
           <p className="mb-3 text-sm text-ink-secondary">
-            Media squadra:{' '}
+            Mediana squadra:{' '}
             <span className="font-display text-lg font-semibold tabular-nums text-ink">
-              {teamAvgMicrocyclePct?.toFixed(0)}%
+              {teamMedianMicrocyclePct?.toFixed(0)}%
             </span>{' '}
             di "{microMetricDef.label}" rispetto a una settimana tipo storica (Ripresa + Forza + Metabolico +
             Rifinitura), da giocatore attivo con dati sufficienti.
