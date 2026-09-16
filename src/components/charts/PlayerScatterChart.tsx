@@ -21,6 +21,22 @@ function formatValue(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1)
 }
 
+/**
+ * Recharts' default numeric domain is [0, dataMax] — fine for a bar chart
+ * anchored to zero, but it crowds every point into a sliver of the axis for
+ * a variable whose real values sit far from zero (height, weight, Vmax...).
+ * Zoom to the data's own spread instead, with headroom so points don't sit
+ * flush against the axis. Never dips below 0 — every variable here is a
+ * physically non-negative quantity.
+ */
+function tightDomain(values: number[]): [number, number] {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min
+  const pad = range > 0 ? range * 0.15 : Math.max(Math.abs(max) * 0.1, 1)
+  return [Math.max(0, min - pad), max + pad]
+}
+
 /** One accent-colored dot per player, with initials set directly inside the
  * mark — identity is legible at a glance without a legend or hover, matching
  * the "label inside a colored fill" exception (pick ink by the fill's
@@ -81,6 +97,9 @@ function ScatterTooltip({
 }
 
 export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: PlayerScatterChartProps) {
+  const xDomain = tightDomain(points.map((p) => p.x))
+  const yDomain = tightDomain(points.map((p) => p.y))
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ScatterChart margin={{ top: 12, right: 24, bottom: 24, left: 8 }}>
@@ -89,6 +108,7 @@ export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: Pla
           type="number"
           dataKey="x"
           name={xLabel}
+          domain={xDomain}
           padding={{ left: 24, right: 24 }}
           tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }}
           axisLine={{ stroke: 'var(--color-baseline)' }}
@@ -99,6 +119,7 @@ export function PlayerScatterChart({ points, xLabel, yLabel, height = 380 }: Pla
           type="number"
           dataKey="y"
           name={yLabel}
+          domain={yDomain}
           padding={{ top: 24, bottom: 24 }}
           tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }}
           axisLine={false}
