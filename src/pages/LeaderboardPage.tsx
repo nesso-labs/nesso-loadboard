@@ -1,5 +1,6 @@
 import { Trophy } from 'lucide-react'
 import { useState } from 'react'
+import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
@@ -97,26 +98,14 @@ export function LeaderboardPage() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ink-secondary">Da</span>
-          <input
-            type="date"
-            value={effectiveStart}
-            max={effectiveEnd}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ink-secondary">A</span>
-          <input
-            type="date"
-            value={effectiveEnd}
-            min={effectiveStart}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
-          />
-        </label>
+        <DateRangePicker
+          startDate={effectiveStart}
+          endDate={effectiveEnd}
+          onChange={(newStart, newEnd) => {
+            setStartDate(newStart)
+            setEndDate(newEnd)
+          }}
+        />
       </div>
 
       <div className="panel p-4">
