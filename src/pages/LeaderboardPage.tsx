@@ -2,12 +2,9 @@ import { Trophy } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
-import { isoWeek } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import type { DrillSegment } from '../types/domain'
-
-type Scope = 'session' | 'week'
 
 interface MetricSpec {
   key: string
@@ -23,8 +20,11 @@ export function LeaderboardPage() {
   const { data: segments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
-  const [scope, setScope] = useState<Scope>('session')
   const [metricKey, setMetricKey] = useState('td')
+  // Empty means "not touched by the user yet" — falls back to the current session's own date below,
+  // so the default view still shows a single day (that session) rather than the whole history.
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   if (!currentSession || isLoading || !settings) return null
 
@@ -41,10 +41,12 @@ export function LeaderboardPage() {
   ]
   const metric = metrics.find((m) => m.key === metricKey)!
 
-  const scopeSessionIds =
-    scope === 'session'
-      ? new Set([currentSession.id])
-      : new Set(sessions.filter((s) => isoWeek(s.date) === isoWeek(currentSession.date)).map((s) => s.id))
+  const effectiveStart = startDate || currentSession.date
+  const effectiveEnd = endDate || currentSession.date
+
+  const scopeSessionIds = new Set(
+    sessions.filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd).map((s) => s.id),
+  )
 
   const scopedSegs = segments.filter(
     (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
@@ -54,8 +56,8 @@ export function LeaderboardPage() {
     return (
       <EmptyState
         icon={Trophy}
-        title="Nessun dato per questo ambito"
-        description="Nessuna riga 'Full Session' trovata per la sessione o settimana selezionata."
+        title="Nessun dato per questo periodo"
+        description="Nessuna riga 'Full Session' trovata tra le date selezionate."
       />
     )
   }
@@ -95,22 +97,26 @@ export function LeaderboardPage() {
             ))}
           </select>
         </label>
-        <div className="flex rounded-md border border-border p-0.5 text-sm">
-          <button
-            type="button"
-            onClick={() => setScope('session')}
-            className={`rounded px-3 py-1 ${scope === 'session' ? 'bg-accent text-accent-ink' : 'text-ink-secondary'}`}
-          >
-            Sessione
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope('week')}
-            className={`rounded px-3 py-1 ${scope === 'week' ? 'bg-accent text-accent-ink' : 'text-ink-secondary'}`}
-          >
-            Settimana
-          </button>
-        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-ink-secondary">Da</span>
+          <input
+            type="date"
+            value={effectiveStart}
+            max={effectiveEnd}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-ink-secondary">A</span>
+          <input
+            type="date"
+            value={effectiveEnd}
+            min={effectiveStart}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
+          />
+        </label>
       </div>
 
       <div className="panel p-4">
