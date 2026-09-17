@@ -1,5 +1,6 @@
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { DateRangePicker } from '../components/ui/DateRangePicker'
 import { EmptyState } from '../components/ui/EmptyState'
 import {
   accHighCount,
@@ -7,13 +8,12 @@ import {
   distanceAbove19_8,
   distanceAbove25_2,
   mechanicalWork,
-  mechanicalWorkPerMin,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { median, percentileRank } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { usePlayersQuery, useSegmentsBySessionQuery, useSettingsQuery } from '../state/queries'
-import { TRAINING_TYPE_LABEL, type DrillSegment } from '../types/domain'
+import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { matchDayLabels, type DrillSegment } from '../types/domain'
 
 const PLAYER_COLORS = ['var(--color-series-blue)', 'var(--color-series-orange)', 'var(--color-series-aqua)']
 const MAX_PLAYERS = 3
@@ -22,33 +22,74 @@ interface MetricSpec {
   key: string
   label: string
   unit: string
-  getValue: (s: DrillSegment) => number
+  aggregate: (segs: DrillSegment[]) => number
   format?: (v: number) => string
 }
 
+const sumBy =
+  (getValue: (s: DrillSegment) => number) =>
+  (segs: DrillSegment[]): number =>
+    segs.reduce((acc, s) => acc + getValue(s), 0)
+
+const maxBy =
+  (getValue: (s: DrillSegment) => number) =>
+  (segs: DrillSegment[]): number =>
+    Math.max(...segs.map(getValue))
+
+// Rates (m/min, mechanical work/min) are recomputed from the summed totals rather than summed
+// themselves — summing a per-minute rate across days would inflate it, not aggregate it.
+const ratePerMin =
+  (numerator: (s: DrillSegment) => number) =>
+  (segs: DrillSegment[]): number => {
+    const totalMin = sumBy((s) => s.durationSec)(segs) / 60
+    return totalMin > 0 ? sumBy(numerator)(segs) / totalMin : 0
+  }
+
 export function ComparePage() {
   const { currentSession } = useCurrentSession()
-  const { data: segments = [], isLoading } = useSegmentsBySessionQuery(currentSession?.id)
+  const { data: sessions = [] } = useSessionsQuery()
+  const { data: segments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // Empty means "not touched by the user yet" — falls back to the current session's own date,
+  // so the default view still shows a single day rather than the whole history.
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const playerById = new Map(players.map((p) => [p.id, p]))
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
 
   if (!currentSession || isLoading || !settings) return null
 
-  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId))
+  const effectiveStart = startDate || currentSession.date
+  const effectiveEnd = endDate || currentSession.date
 
-  if (fullSessionSegs.length === 0) {
+  const scopeSessionIds = new Set(
+    sessions.filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd).map((s) => s.id),
+  )
+
+  const scopedSegs = segments.filter(
+    (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
+  )
+
+  if (scopedSegs.length === 0) {
     return (
       <EmptyState
         icon={Users}
-        title="Nessun dato per questa sessione"
-        description="Serve almeno una riga 'Full Session' per confrontare i giocatori."
+        title="Nessun dato per questo periodo"
+        description="Nessuna riga 'Full Session' trovata tra le date selezionate."
       />
     )
   }
+
+  const segsByPlayer = new Map<string, DrillSegment[]>()
+  for (const seg of scopedSegs) {
+    const list = segsByPlayer.get(seg.playerId) ?? []
+    list.push(seg)
+    segsByPlayer.set(seg.playerId, list)
+  }
+  const playersInScope = [...segsByPlayer.keys()]
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {
@@ -58,68 +99,72 @@ export function ComparePage() {
     })
   }
 
-  const selectedSegs = selectedIds
-    .map((id) => fullSessionSegs.find((s) => s.playerId === id))
-    .filter((s): s is DrillSegment => !!s)
+  const selectedPlayerIds = selectedIds.filter((id) => segsByPlayer.has(id))
 
   const sections: { title: string; metrics: MetricSpec[] }[] = [
     {
       title: 'Volume',
       metrics: [
-        { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM },
-        { key: 'tdmin', label: 'Distanza / min', unit: 'm/min', getValue: (s) => s.distancePerMin, format: (v) => v.toFixed(1) },
-        { key: 'dur', label: 'Durata', unit: 'min', getValue: (s) => s.durationSec / 60 },
+        { key: 'td', label: 'Distanza totale', unit: 'm', aggregate: sumBy((s) => s.totalDistanceM) },
+        { key: 'tdmin', label: 'Distanza / min', unit: 'm/min', aggregate: ratePerMin((s) => s.totalDistanceM), format: (v) => v.toFixed(1) },
+        { key: 'dur', label: 'Durata', unit: 'min', aggregate: sumBy((s) => s.durationSec / 60) },
       ],
     },
     {
       title: 'Alta velocità',
       metrics: [
-        { key: 'hsr', label: 'HSR (>19.8 km/h)', unit: 'm', getValue: distanceAbove19_8 },
-        { key: 'sprintd', label: 'Sprint (>25.2 km/h)', unit: 'm', getValue: distanceAbove25_2 },
-        { key: 'nsprint', label: '# Sprint', unit: '', getValue: (s) => sprintCount(s, settings) },
-        { key: 'vmax', label: 'Velocità massima', unit: 'km/h', getValue: (s) => s.maxSpeedKmh, format: (v) => v.toFixed(1) },
+        { key: 'hsr', label: 'HSR (>19.8 km/h)', unit: 'm', aggregate: sumBy(distanceAbove19_8) },
+        { key: 'sprintd', label: 'Sprint (>25.2 km/h)', unit: 'm', aggregate: sumBy(distanceAbove25_2) },
+        { key: 'nsprint', label: '# Sprint', unit: '', aggregate: sumBy((s) => sprintCount(s, settings)) },
+        { key: 'vmax', label: 'Velocità massima', unit: 'km/h', aggregate: maxBy((s) => s.maxSpeedKmh), format: (v) => v.toFixed(1) },
       ],
     },
     {
       title: 'Meccanico',
       metrics: [
-        { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s) => mechanicalWork(s, settings) },
-        { key: 'mechwmin', label: 'MechW / min', unit: '#/min', getValue: (s) => mechanicalWorkPerMin(s, settings), format: (v) => v.toFixed(2) },
-        { key: 'acchigh', label: 'Acc. alta', unit: '#', getValue: (s) => accHighCount(s, settings) },
-        { key: 'dechigh', label: 'Dec. alta', unit: '#', getValue: (s) => decHighCount(s, settings) },
+        { key: 'mechw', label: 'Mechanical Work', unit: '#', aggregate: sumBy((s) => mechanicalWork(s, settings)) },
+        { key: 'mechwmin', label: 'MechW / min', unit: '#/min', aggregate: ratePerMin((s) => mechanicalWork(s, settings)), format: (v) => v.toFixed(2) },
+        { key: 'acchigh', label: 'Acc. alta', unit: '#', aggregate: sumBy((s) => accHighCount(s, settings)) },
+        { key: 'dechigh', label: 'Dec. alta', unit: '#', aggregate: sumBy((s) => decHighCount(s, settings)) },
       ],
     },
   ]
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm text-ink-secondary">
-        Sessione: <span className="font-medium text-ink">{currentSession.label}</span> —{' '}
-        <span className="tabular-nums">{currentSession.date}</span> —{' '}
-        {currentSession.type === 'match'
-          ? 'Partita'
-          : currentSession.trainingType
-            ? `Allenamento (${TRAINING_TYPE_LABEL[currentSession.trainingType]})`
-            : 'Allenamento (non classificato)'}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-ink-secondary">Periodo</span>
+        <DateRangePicker
+          startDate={effectiveStart}
+          endDate={effectiveEnd}
+          onChange={(newStart, newEnd) => {
+            setStartDate(newStart)
+            setEndDate(newEnd)
+          }}
+          matchDayLabels={matchDayLabels(sessions)}
+        />
+        <span className="text-xs text-ink-muted">
+          I dati dei giorni selezionati vengono sommati (o presi al massimo/ricalcolati per le metriche al minuto).
+        </span>
+      </div>
 
       <div>
         <p className="mb-2 text-sm font-medium text-ink-secondary">Scegli fino a {MAX_PLAYERS} giocatori</p>
         <div className="flex flex-wrap gap-2">
-          {fullSessionSegs.map((s) => {
-            const idx = selectedIds.indexOf(s.playerId)
+          {playersInScope.map((playerId) => {
+            const idx = selectedIds.indexOf(playerId)
             const isSelected = idx >= 0
             return (
               <button
-                key={s.playerId}
+                key={playerId}
                 type="button"
-                onClick={() => toggle(s.playerId)}
+                onClick={() => toggle(playerId)}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                   isSelected ? 'border-transparent text-white' : 'border-border text-ink-secondary hover:bg-ink/5'
                 }`}
                 style={isSelected ? { backgroundColor: PLAYER_COLORS[idx] } : undefined}
               >
-                {playerById.get(s.playerId)?.displayName ?? s.playerId}
+                {playerById.get(playerId)?.displayName ?? playerId}
               </button>
             )
           })}
@@ -130,18 +175,18 @@ export function ComparePage() {
         </p>
       </div>
 
-      {selectedSegs.length === 0 ? (
+      {selectedPlayerIds.length === 0 ? (
         <EmptyState icon={Users} title="Seleziona almeno un giocatore" description="Scegli fino a 3 giocatori sopra per confrontarli." />
       ) : (
         <>
           <div className="flex items-center gap-4 text-xs">
-            {selectedSegs.map((s, i) => (
-              <div key={s.playerId} className="flex items-center gap-1.5">
+            {selectedPlayerIds.map((playerId, i) => (
+              <div key={playerId} className="flex items-center gap-1.5">
                 <span className="size-2.5 rounded-full" style={{ backgroundColor: PLAYER_COLORS[i] }} />
-                <span className="font-medium text-ink">{playerById.get(s.playerId)?.displayName}</span>
+                <span className="font-medium text-ink">{playerById.get(playerId)?.displayName}</span>
               </div>
             ))}
-            <span className="text-ink-muted">La riga grigia sulle barre è la mediana squadra (n={fullSessionSegs.length})</span>
+            <span className="text-ink-muted">La riga grigia sulle barre è la mediana squadra (n={playersInScope.length})</span>
           </div>
 
           {sections.map((section) => (
@@ -149,7 +194,7 @@ export function ComparePage() {
               <p className="font-display mb-3 text-base font-medium text-ink">{section.title}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {section.metrics.map((metric) => {
-                  const allValues = fullSessionSegs.map(metric.getValue)
+                  const allValues = playersInScope.map((playerId) => metric.aggregate(segsByPlayer.get(playerId)!))
                   const teamMedian = median(allValues)
                   const format = metric.format ?? ((v: number) => v.toFixed(0))
                   const maxScale = Math.max(...allValues, 1)
@@ -158,11 +203,11 @@ export function ComparePage() {
                       <p className="text-xs font-medium text-ink-secondary">
                         {metric.label} {metric.unit && <span className="text-ink-muted">({metric.unit})</span>}
                       </p>
-                      {selectedSegs.map((seg, i) => {
-                        const value = metric.getValue(seg)
+                      {selectedPlayerIds.map((playerId, i) => {
+                        const value = metric.aggregate(segsByPlayer.get(playerId)!)
                         const pct = percentileRank(value, allValues)
                         return (
-                          <div key={seg.playerId} className="flex items-center gap-2 text-xs">
+                          <div key={playerId} className="flex items-center gap-2 text-xs">
                             <div className="relative h-4 flex-1 rounded bg-ink/5">
                               <div
                                 className="h-4 rounded"

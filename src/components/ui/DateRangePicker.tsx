@@ -20,6 +20,8 @@ interface DateRangePickerProps {
   startDate: string
   endDate: string
   onChange: (startDate: string, endDate: string) => void
+  /** ISO "YYYY-MM-DD" -> opponent's 3-letter code, shown under the day number on match days. */
+  matchDayLabels?: Record<string, string>
 }
 
 const MONTH_LABEL = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
@@ -44,7 +46,7 @@ function formatRangeLabel(startIso: string, endIso: string): string {
  * close (order-independent: whichever day is earlier becomes the start).
  * Clicking the same day twice yields a one-day range.
  */
-export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+export function DateRangePicker({ startDate, endDate, onChange, matchDayLabels = {} }: DateRangePickerProps) {
   const [open, setOpen] = useState(false)
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(parseISO(startDate)))
   const [pendingStart, setPendingStart] = useState<Date | null>(null)
@@ -54,7 +56,9 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
   const end = parseISO(endDate)
 
   const openPicker = () => {
-    setVisibleMonth(startOfMonth(start))
+    // Always opens on today's month, regardless of which month the current selection falls in —
+    // the selection is highlighted wherever the user navigates to, but the starting point is "now".
+    setVisibleMonth(startOfMonth(new Date()))
     setPendingStart(null)
     setHoverDate(null)
     setOpen(true)
@@ -109,17 +113,17 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
             className="fixed inset-0 z-40 cursor-default"
             onClick={closePicker}
           />
-          <div className="panel absolute left-0 top-full z-50 mt-2 w-64 p-3">
-            <div className="mb-2 flex items-center justify-between">
+          <div className="panel absolute left-0 top-full z-50 mt-2 w-80 p-4">
+            <div className="mb-3 flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setVisibleMonth((m) => addMonths(m, -1))}
                 className="rounded-md p-1 text-ink-secondary hover:bg-ink/5"
                 aria-label="Mese precedente"
               >
-                <ChevronLeft className="size-4" />
+                <ChevronLeft className="size-5" />
               </button>
-              <span className="font-display text-sm font-medium text-ink">
+              <span className="font-display text-base font-medium text-ink">
                 {MONTH_LABEL[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}
               </span>
               <button
@@ -128,21 +132,22 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                 className="rounded-md p-1 text-ink-secondary hover:bg-ink/5"
                 aria-label="Mese successivo"
               >
-                <ChevronRight className="size-4" />
+                <ChevronRight className="size-5" />
               </button>
             </div>
 
-            <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-medium uppercase text-ink-muted">
+            <div className="mb-1 grid grid-cols-7 text-center text-xs font-medium uppercase text-ink-muted">
               {WEEKDAY_LABEL.map((d, i) => (
                 <span key={i}>{d}</span>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-y-0.5 text-center text-xs">
+            <div className="grid grid-cols-7 gap-y-1 text-center text-sm">
               {days.map((day) => {
                 const inMonth = isSameMonth(day, visibleMonth)
                 const inRange = inMonth && isWithinInterval(day, { start: previewStart, end: previewEnd })
                 const isEndpoint = inMonth && (isSameDay(day, previewStart) || isSameDay(day, previewEnd))
+                const matchLabel = inMonth ? matchDayLabels[format(day, 'yyyy-MM-dd')] : undefined
                 return (
                   <button
                     key={day.toISOString()}
@@ -151,7 +156,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                     onMouseEnter={() => setHoverDate(day)}
                     disabled={!inMonth}
                     title={format(day, 'yyyy-MM-dd')}
-                    className={`flex h-7 w-full items-center justify-center rounded tabular-nums ${
+                    className={`flex h-11 w-full flex-col items-center justify-center gap-0.5 rounded tabular-nums ${
                       !inMonth
                         ? 'text-ink-muted/30'
                         : isEndpoint
@@ -163,13 +168,16 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                               : 'text-ink hover:bg-ink/5'
                     }`}
                   >
-                    {day.getDate()}
+                    <span>{day.getDate()}</span>
+                    {matchLabel && (
+                      <span className="text-[9px] font-semibold uppercase leading-none opacity-70">{matchLabel}</span>
+                    )}
                   </button>
                 )
               })}
             </div>
 
-            <p className="mt-2 text-center text-[11px] text-ink-muted">
+            <p className="mt-2 text-center text-xs text-ink-muted">
               {pendingStart ? 'Seleziona la data di fine' : 'Seleziona la data di inizio'}
             </p>
           </div>

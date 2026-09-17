@@ -42,6 +42,20 @@ export function buildMatchLabel(opponentName: string, location: MatchLocation): 
   return `${opponentName.trim()} ${suffix}`
 }
 
+/** Opponent's 3-letter code, e.g. for the calendar day badge — "Internazionale" -> "INT". */
+export function opponentInitials(opponentName: string): string {
+  return opponentName.trim().slice(0, 3).toUpperCase()
+}
+
+/** ISO "YYYY-MM-DD" -> opponent's 3-letter code, for every match session — feeds the calendar's match-day badges. */
+export function matchDayLabels(sessions: Session[]): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const s of sessions) {
+    if (s.type === 'match' && s.opponentName) result[s.date] = opponentInitials(s.opponentName)
+  }
+  return result
+}
+
 /** One CSV row, after type coercion, before grouping/aggregation. */
 export interface RawCsvRow {
   playerDisplayName: string

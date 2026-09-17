@@ -6,7 +6,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import type { DrillSegment, SessionType } from '../types/domain'
+import { matchDayLabels, type DrillSegment, type SessionType } from '../types/domain'
 
 type TypeFilter = SessionType | 'all'
 
@@ -176,6 +176,7 @@ export function LeaderboardPage() {
             setStartDate(newStart)
             setEndDate(newEnd)
           }}
+          matchDayLabels={matchDayLabels(sessions)}
         />
         <div className="flex rounded-md border border-border p-0.5 text-sm">
           {(Object.keys(TYPE_FILTER_LABEL) as TypeFilter[]).map((tf) => (
