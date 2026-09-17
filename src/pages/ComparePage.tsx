@@ -13,10 +13,18 @@ import {
 import { median, percentileRank } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import { matchDayLabels, type DrillSegment } from '../types/domain'
+import { matchDayLabels, type DrillSegment, type SessionType } from '../types/domain'
 
 const PLAYER_COLORS = ['var(--color-series-blue)', 'var(--color-series-orange)', 'var(--color-series-aqua)']
 const MAX_PLAYERS = 3
+
+type TypeFilter = SessionType | 'all'
+
+const TYPE_FILTER_LABEL: Record<TypeFilter, string> = {
+  all: 'ALL',
+  training: 'Training',
+  match: 'Match',
+}
 
 interface MetricSpec {
   key: string
@@ -56,6 +64,7 @@ export function ComparePage() {
   // so the default view still shows a single day rather than the whole history.
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const playerById = new Map(players.map((p) => [p.id, p]))
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
@@ -66,7 +75,10 @@ export function ComparePage() {
   const effectiveEnd = endDate || currentSession.date
 
   const scopeSessionIds = new Set(
-    sessions.filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd).map((s) => s.id),
+    sessions
+      .filter((s) => s.date >= effectiveStart && s.date <= effectiveEnd)
+      .filter((s) => typeFilter === 'all' || s.type === typeFilter)
+      .map((s) => s.id),
   )
 
   const scopedSegs = segments.filter(
@@ -143,6 +155,18 @@ export function ComparePage() {
           }}
           matchDayLabels={matchDayLabels(sessions)}
         />
+        <div className="flex rounded-md border border-border p-0.5 text-sm">
+          {(Object.keys(TYPE_FILTER_LABEL) as TypeFilter[]).map((tf) => (
+            <button
+              key={tf}
+              type="button"
+              onClick={() => setTypeFilter(tf)}
+              className={`rounded px-3 py-1 ${typeFilter === tf ? 'bg-accent text-accent-ink' : 'text-ink-secondary'}`}
+            >
+              {TYPE_FILTER_LABEL[tf]}
+            </button>
+          ))}
+        </div>
         <span className="text-xs text-ink-muted">
           I dati dei giorni selezionati vengono sommati (o presi al massimo/ricalcolati per le metriche al minuto).
         </span>

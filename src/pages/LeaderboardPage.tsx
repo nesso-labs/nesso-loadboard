@@ -11,9 +11,9 @@ import { matchDayLabels, type DrillSegment, type SessionType } from '../types/do
 type TypeFilter = SessionType | 'all'
 
 const TYPE_FILTER_LABEL: Record<TypeFilter, string> = {
-  all: 'Entrambi',
-  training: 'Allenamenti',
-  match: 'Partite',
+  all: 'ALL',
+  training: 'Training',
+  match: 'Match',
 }
 
 interface MetricSpec {
