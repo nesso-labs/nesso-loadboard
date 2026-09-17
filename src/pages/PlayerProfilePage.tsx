@@ -5,12 +5,19 @@ import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatTile } from '../components/ui/StatTile'
 import { computeSessionAlerts, type AlertSeverity, type DatedFullSession } from '../lib/metrics/alerts'
-import { MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
+import {
+  distanceAbove19_8,
+  distanceAbove25_2,
+  MICROCYCLE_METRICS,
+  mechanicalWork,
+  sprintCount,
+} from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useRpeBySessionQuery, useSegmentsByPlayerQuery, useSettingsQuery } from '../state/queries'
+import type { DrillSegment } from '../types/domain'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
   'valid-cycles': 'vs media dei microcicli storici completi (Ripresa+Forza+Metabolico+Rifinitura)',
@@ -30,6 +37,13 @@ const SEVERITY_LABEL: Record<AlertSeverity, string> = {
   warning: 'Attenzione',
 }
 
+interface TrendMetricSpec {
+  key: string
+  label: string
+  unit: string
+  getValue: (s: DrillSegment) => number
+}
+
 export function PlayerProfilePage() {
   const { data: players = [], isLoading: loadingPlayers } = usePlayersQuery()
   const { sessions, currentSession } = useCurrentSession()
@@ -37,6 +51,10 @@ export function PlayerProfilePage() {
   const { data: allSegments = [] } = useAllSegmentsQuery()
   const { data: currentSessionRpe = [] } = useRpeBySessionQuery(currentSession?.id)
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const [trendMetricKey, setTrendMetricKey] = useState('td')
+  // Session ids excluded from the trend line above — everything is included by default,
+  // so this only ever grows from the "deselect a row" checkboxes in the table below.
+  const [excludedSegIds, setExcludedSegIds] = useState<Set<string>>(new Set())
 
   const activeRosterPlayers = useMemo(() => players.filter((p) => p.active), [players])
   const activePlayerId = selectedId && activeRosterPlayers.some((p) => p.id === selectedId) ? selectedId : activeRosterPlayers[0]?.id
@@ -62,6 +80,31 @@ export function PlayerProfilePage() {
     .map((s) => ({ segment: s, session: sessionById.get(s.sessionId) }))
     .filter((row): row is { segment: (typeof segments)[number]; session: NonNullable<(typeof row)['session']> } => !!row.session)
     .sort((a, b) => a.session.date.localeCompare(b.session.date))
+
+  const trendMetrics: TrendMetricSpec[] = [
+    { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM },
+    { key: 'hsr', label: 'Distanza > 19.8 km/h', unit: 'm', getValue: distanceAbove19_8 },
+    { key: 'sprintd', label: 'Distanza > 25.2 km/h', unit: 'm', getValue: distanceAbove25_2 },
+    { key: 'vmax', label: 'Velocità massima', unit: 'km/h', getValue: (s) => s.maxSpeedKmh },
+    ...(settings
+      ? [
+          { key: 'sprints', label: 'Sprint', unit: '#', getValue: (s: DrillSegment) => sprintCount(s, settings) },
+          { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s: DrillSegment) => mechanicalWork(s, settings) },
+        ]
+      : []),
+  ]
+  const trendMetric = trendMetrics.find((m) => m.key === trendMetricKey) ?? trendMetrics[0]
+
+  const toggleSegSelection = (id: string) => {
+    setExcludedSegIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const chartRows = fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
 
   const sessionCount = new Set(segments.map((s) => s.sessionId)).size
   const avgDistance =
@@ -241,11 +284,35 @@ export function PlayerProfilePage() {
 
           {fullSessionSegs.length >= 2 ? (
             <div className="panel p-4">
-              <p className="mb-2 text-sm font-semibold text-ink">Distanza totale nel tempo</p>
-              <TrendLine
-                data={fullSessionSegs.map((r) => ({ x: r.session.date, value: r.segment.totalDistanceM }))}
-                valueFormatter={(v) => `${formatNumber(v)} m`}
-              />
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-ink">{trendMetric.label} nel tempo</p>
+                <label className="flex items-center gap-2 text-xs">
+                  <span className="text-ink-secondary">Metrica</span>
+                  <select
+                    value={trendMetricKey}
+                    onChange={(e) => setTrendMetricKey(e.target.value)}
+                    className="rounded-md border border-border bg-surface px-2 py-1 text-ink"
+                  >
+                    {trendMetrics.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {chartRows.length >= 2 ? (
+                <TrendLine
+                  data={chartRows.map((r) => ({ x: r.session.date, value: trendMetric.getValue(r.segment) }))}
+                  valueFormatter={(v) =>
+                    `${formatNumber(v, trendMetric.unit === 'km/h' ? 1 : 0)}${trendMetric.unit ? ` ${trendMetric.unit}` : ''}`
+                  }
+                />
+              ) : (
+                <p className="py-10 text-center text-xs text-ink-muted">
+                  Seleziona almeno 2 sessioni nella tabella qui sotto per vedere l'andamento.
+                </p>
+              )}
             </div>
           ) : (
             <EmptyState
@@ -256,11 +323,33 @@ export function PlayerProfilePage() {
           )}
 
           <div>
-            <p className="mb-3 text-sm font-semibold text-ink">Storico sessioni</p>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">Storico sessioni</p>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-ink-muted">Seleziona le sessioni da includere nel grafico sopra</span>
+                <button
+                  type="button"
+                  onClick={() => setExcludedSegIds(new Set())}
+                  className="font-medium text-accent hover:underline"
+                >
+                  Seleziona tutto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExcludedSegIds(new Set(fullSessionSegs.map((r) => r.segment.id)))}
+                  className="font-medium text-accent hover:underline"
+                >
+                  Deseleziona tutto
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto panel">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                    <th className="px-4 py-2">
+                      <span className="sr-only">Includi nel grafico</span>
+                    </th>
                     <th className="px-4 py-2">Data</th>
                     <th className="px-4 py-2">Etichetta</th>
                     <th className="px-3 py-2 text-right">TD (m)</th>
@@ -269,8 +358,19 @@ export function PlayerProfilePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...fullSessionSegs].reverse().map((r) => (
-                    <tr key={r.segment.id} className="border-b border-border last:border-0">
+                  {[...fullSessionSegs].reverse().map((r) => {
+                    const included = !excludedSegIds.has(r.segment.id)
+                    return (
+                    <tr key={r.segment.id} className={`border-b border-border last:border-0 ${included ? '' : 'opacity-40'}`}>
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={included}
+                          onChange={() => toggleSegSelection(r.segment.id)}
+                          aria-label={`Includi la sessione del ${r.session.date} nel grafico`}
+                          className="size-4 rounded border-border accent-[var(--color-accent)]"
+                        />
+                      </td>
                       <td className="px-4 py-2 tabular-nums text-ink">{r.session.date}</td>
                       <td className="px-4 py-2 text-ink-secondary">{r.session.label}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-ink">
@@ -281,7 +381,8 @@ export function PlayerProfilePage() {
                         {r.segment.maxSpeedKmh.toFixed(1)}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
