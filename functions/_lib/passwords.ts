@@ -1,14 +1,22 @@
 /**
  * PBKDF2-SHA256 password hashing via Web Crypto — there is no bcrypt/argon2
  * native binding in the Workers runtime, but PBKDF2 through crypto.subtle
- * runs natively (not a JS loop), so an OWASP-range iteration count stays fast.
+ * runs natively (not a JS loop), so the iteration count below stays fast.
  *
  * Stored format is self-describing so the scheme/cost can change later
  * without invalidating existing hashes:
  *   pbkdf2-sha256$<iterations>$<saltB64url>$<hashB64url>
  */
 
-const ITERATIONS = 210_000
+/**
+ * The Workers runtime rejects PBKDF2 above 100k iterations outright: verified on
+ * production, 100_000 derives fine and 100_001 throws, which surfaces as an
+ * opaque 1101 on every login. So OWASP's 210k recommendation is not reachable
+ * here — this is the ceiling, not a tuning choice, and raising it makes every
+ * account it hashes permanently unable to log in.
+ */
+const MAX_ITERATIONS = 100_000
+const ITERATIONS = MAX_ITERATIONS
 const SALT_BYTES = 16
 const HASH_BYTES = 32
 
@@ -46,6 +54,10 @@ export async function verifyPassword(password: string, stored: string): Promise<
   if (parts.length !== 4 || parts[0] !== 'pbkdf2-sha256') return false
   const iterations = Number(parts[1])
   if (!Number.isSafeInteger(iterations) || iterations <= 0) return false
+  // A hash stored above the runtime's ceiling can never be re-derived here, so
+  // deriveBits would throw and take the login down. Refuse it as a failed
+  // comparison instead — the account needs a password reset, not a 500.
+  if (iterations > MAX_ITERATIONS) return false
 
   const salt = fromBase64Url(parts[2])
   const expected = fromBase64Url(parts[3])
