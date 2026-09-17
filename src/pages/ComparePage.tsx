@@ -10,7 +10,7 @@ import {
   mechanicalWork,
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
-import { median, percentileRank } from '../lib/metrics/heatmap'
+import { median } from '../lib/metrics/heatmap'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { matchDayLabels, type DrillSegment, type SessionType } from '../types/domain'
@@ -52,6 +52,11 @@ const ratePerMin =
     const totalMin = sumBy((s) => s.durationSec)(segs) / 60
     return totalMin > 0 ? sumBy(numerator)(segs) / totalMin : 0
   }
+
+/** 1-based rank of `value` within `allValues`, higher is better — ties share the same rank. */
+function teamRank(value: number, allValues: number[]): number {
+  return 1 + allValues.filter((v) => v > value).length
+}
 
 export function ComparePage() {
   const { currentSession } = useCurrentSession()
@@ -229,7 +234,7 @@ export function ComparePage() {
                       </p>
                       {selectedPlayerIds.map((playerId, i) => {
                         const value = metric.aggregate(segsByPlayer.get(playerId)!)
-                        const pct = percentileRank(value, allValues)
+                        const rank = teamRank(value, allValues)
                         return (
                           <div key={playerId} className="flex items-center gap-2 text-xs">
                             <div className="relative h-4 flex-1 rounded bg-ink/5">
@@ -243,7 +248,7 @@ export function ComparePage() {
                               />
                             </div>
                             <span className="w-24 shrink-0 text-right tabular-nums text-ink">
-                              {format(value)} <span className="text-ink-muted">({pct.toFixed(0)}°)</span>
+                              {format(value)} <span className="text-ink-muted">({rank}°)</span>
                             </span>
                           </div>
                         )
