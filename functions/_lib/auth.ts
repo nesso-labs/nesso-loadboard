@@ -132,6 +132,15 @@ export async function destroySession(request: Request, env: Env): Promise<void> 
   await env.DB.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').bind(tokenHash).run()
 }
 
+/** The gate cannot enforce anything if migration 0007 hasn't run yet — refuse, loudly, with a next step. */
+export function schemaNotReady(): Response {
+  return new Response(
+    'Lo schema di autenticazione (tabelle users/auth_sessions/login_audit, colonne workspace_id) non risulta ancora applicato a questo database. ' +
+      'Esegui `wrangler d1 migrations apply` e lo script di seed/backfill, poi ricarica.',
+    { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } },
+  )
+}
+
 /**
  * Only same-origin absolute paths survive, so the login form cannot be turned
  * into an open redirect. `//evil.com` is a protocol-relative URL, not a path.

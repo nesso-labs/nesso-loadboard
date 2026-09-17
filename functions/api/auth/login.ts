@@ -1,4 +1,4 @@
-import { createSession, loginPage, safeReturnPath } from '../../_lib/auth'
+import { createSession, loginPage, safeReturnPath, schemaNotReady } from '../../_lib/auth'
 import type { Env } from '../../_lib/mappers'
 import { verifyPassword } from '../../_lib/passwords'
 
@@ -19,9 +19,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const returnPath = safeReturnPath(String(form.get('next') ?? '/'))
   const userAgent = request.headers.get('user-agent')
 
-  const user = await env.DB.prepare('SELECT id, email, password_hash, active FROM users WHERE email = ? COLLATE NOCASE')
-    .bind(email)
-    .first<UserRow>()
+  let user: UserRow | null
+  try {
+    user = await env.DB.prepare('SELECT id, email, password_hash, active FROM users WHERE email = ? COLLATE NOCASE')
+      .bind(email)
+      .first<UserRow>()
+  } catch {
+    return schemaNotReady()
+  }
 
   const passwordOk = user ? await verifyPassword(password, user.password_hash) : false
   const active = user ? Boolean(user.active) : false

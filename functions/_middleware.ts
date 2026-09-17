@@ -1,4 +1,4 @@
-import { loginPage, resolveSession, safeReturnPath, type AppData } from './_lib/auth'
+import { loginPage, resolveSession, safeReturnPath, schemaNotReady, type AppData } from './_lib/auth'
 import { forbidden, json } from './_lib/json'
 import type { Env } from './_lib/mappers'
 
@@ -33,7 +33,18 @@ export const onRequest: PagesFunction<Env, string, AppData> = async ({ request, 
   // The login endpoint has to stay reachable or there is no way back in.
   if (PUBLIC_PATHS.has(url.pathname)) return next()
 
-  const auth = await resolveSession(request, env)
+  let auth
+  try {
+    auth = await resolveSession(request, env)
+  } catch {
+    // Most likely cause: migration 0007 (users/auth_sessions/login_audit,
+    // workspace_id columns) hasn't been applied to this database yet, so the
+    // lookup query itself fails. Every request runs through here, so an
+    // unguarded throw would take the whole site down with an opaque
+    // Cloudflare "Worker threw exception" — fail loudly with an actionable
+    // message instead.
+    return schemaNotReady()
+  }
 
   if (!auth) {
     // An unauthenticated XHR should fail as data, not as a login page the
