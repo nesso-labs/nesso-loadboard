@@ -23,10 +23,11 @@ export const onRequestPatch: PagesFunction<Env, string, AppData> = async ({ requ
   }
 
   if (body.workspaceOwnerId) {
-    const owner = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND role = 'editor'")
+    // Admins own a workspace too, so they are equally valid owners to bind to.
+    const owner = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND role IN ('editor','admin')")
       .bind(body.workspaceOwnerId)
       .first()
-    if (!owner) return badRequest('editor non trovato')
+    if (!owner) return badRequest('proprietario del workspace non trovato')
   }
 
   const sets: string[] = []

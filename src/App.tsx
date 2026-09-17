@@ -25,18 +25,6 @@ export function App() {
   // "don't flash the wrong screen" while /api/auth/me resolves.
   if (isLoading || !user) return null
 
-  // Admin has no workspace of its own: account management + the login
-  // registry only, never the data pages (enforced again server-side in
-  // _middleware.ts — this is the UX side of that boundary).
-  if (isAdmin) {
-    return (
-      <Routes>
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
-    )
-  }
-
   return (
     <Routes>
       <Route element={<AppLayout />}>
@@ -56,7 +44,11 @@ export function App() {
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
-      <Route path="/admin" element={<Navigate to="/" replace />} />
+      {/* An Admin is a superuser: every data page above, plus the account
+          registry — which keeps its own full-page chrome, so it sits outside
+          AppLayout rather than nested in it. Non-admins are bounced, and
+          _middleware.ts refuses /api/admin/* for them regardless. */}
+      <Route path="/admin" element={isAdmin ? <AdminPage /> : <Navigate to="/" replace />} />
     </Routes>
   )
 }

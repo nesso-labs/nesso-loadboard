@@ -10,7 +10,7 @@ interface AuthValue {
   isAdmin: boolean
   isEditor: boolean
   isViewer: boolean
-  /** True if the signed-in user can create/modify workspace data. Admins never reach data pages, so this is really "is Editor". */
+  /** True if the signed-in user can create/modify workspace data — an Editor or an Admin, never a Viewer. */
   canEdit: boolean
 }
 
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: user?.role === 'admin',
     isEditor: user?.role === 'editor',
     isViewer: user?.role === 'viewer',
-    canEdit: user?.role === 'editor',
+    canEdit: user?.role === 'editor' || user?.role === 'admin',
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
