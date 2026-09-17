@@ -16,10 +16,11 @@ import type { Env } from './_lib/mappers'
  * duplicated in every handler:
  *   - /api/admin/*        → admin only (account management, login registry)
  *   - /api/auth/me|password → any signed-in user (self-service)
- *   - everything else      → editor/viewer only; viewer is read-only (GET)
+ *   - everything else      → admin/editor read-write, viewer read-only (GET)
  *
- * Admins never reach the second bucket — they have no workspace, so there is
- * nothing there for them to read or write. The SPA shell itself (non-/api/
+ * An Admin is a superuser: it owns a workspace like an Editor AND holds the
+ * account registry, so it reaches both buckets. It used to be refused the
+ * second one outright. The SPA shell itself (non-/api/
  * paths) is only gated on "signed in" — which screen renders for which role
  * is a client-side routing concern (see src/App.tsx), since Pages serves the
  * same bundle for every path in a client-routed app.
@@ -58,7 +59,6 @@ export const onRequest: PagesFunction<Env, string, AppData> = async ({ request, 
   if (url.pathname.startsWith('/api/admin/')) {
     if (auth.role !== 'admin') return forbidden()
   } else if (!SELF_SERVICE_AUTH_PATHS.has(url.pathname) && url.pathname.startsWith('/api/')) {
-    if (auth.role === 'admin') return forbidden()
     if (auth.role === 'viewer' && request.method !== 'GET') return forbidden()
   }
 

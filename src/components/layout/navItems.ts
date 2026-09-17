@@ -8,6 +8,7 @@ import {
   type LucideIcon,
   ScanSearch,
   Settings,
+  ShieldCheck,
   Swords,
   Trophy,
   Upload,
@@ -23,6 +24,8 @@ export interface NavItem {
   icon: LucideIcon
   /** True if this page needs multi-session history to be meaningful. */
   needsHistory?: boolean
+  /** Only rendered for an Admin — the account registry lives off the data nav. */
+  adminOnly?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -41,4 +44,5 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/roster', label: 'Roster & Positions', icon: Users },
   { path: '/sessions', label: 'Import / Sessions', icon: Upload },
   { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/admin', label: 'Account', icon: ShieldCheck, adminOnly: true },
 ]

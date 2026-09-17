@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LogOut, ShieldCheck, UserPlus } from 'lucide-react'
+import { ArrowLeft, LogOut, ShieldCheck, UserPlus } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   adminCreateUser,
   adminListLoginAudit,
@@ -292,7 +293,8 @@ function UserRow({ user, editors, isSelf }: { user: AdminUser; editors: AdminUse
 function UsersSection() {
   const { data: users = [], isLoading } = useQuery({ queryKey: ['admin', 'users'], queryFn: adminListUsers })
   const { user: currentUser } = useAuth()
-  const editors = users.filter((u) => u.role === 'editor')
+  // Anyone who owns a workspace can have a Viewer bound to them — Admins included.
+  const editors = users.filter((u) => u.role === 'editor' || u.role === 'admin')
 
   return (
     <div className="flex flex-col gap-4">
@@ -374,6 +376,12 @@ export function AdminPage() {
         <ShieldCheck className="size-5 text-primary" />
         <h1 className="font-display text-base font-medium text-ink">LoadBoard — Admin</h1>
         <div className="ml-auto flex items-center gap-3">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+          >
+            <ArrowLeft className="size-3.5" /> Torna all'app
+          </Link>
           <span className="text-xs text-ink-secondary">{user?.email}</span>
           <ChangePasswordPanel />
           <form method="POST" action="/api/auth/logout">
@@ -391,8 +399,9 @@ export function AdminPage() {
         <section>
           <p className="font-display mb-3 text-base font-medium text-ink">Account</p>
           <p className="mb-3 text-xs text-ink-muted">
-            Ogni Editor ha uno spazio dati isolato (giocatori, sessioni, impostazioni). Un Viewer vede in sola
-            lettura solo lo spazio dell'Editor a cui è associato. L'Admin non ha accesso alle pagine dati.
+            Ogni Editor e ogni Admin ha uno spazio dati isolato (giocatori, sessioni, impostazioni). Un Viewer
+            vede in sola lettura solo lo spazio a cui è associato. L'Admin è un superuser: oltre al proprio
+            spazio dati, gestisce gli account e il registro degli accessi.
           </p>
           <UsersSection />
         </section>

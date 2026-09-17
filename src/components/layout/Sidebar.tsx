@@ -1,11 +1,15 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '../../lib/utils'
+import { useAuth } from '../../state/AuthContext'
 import { NAV_ITEMS } from './navItems'
 
 export function Sidebar({ className }: { className?: string }) {
+  const { isAdmin } = useAuth()
+  const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin)
+
   return (
     <nav className={cn('flex flex-col gap-0.5 overflow-y-auto', className)}>
-      {NAV_ITEMS.map((item) => (
+      {items.map((item) => (
         <NavLink
           key={item.path}
           to={item.path}

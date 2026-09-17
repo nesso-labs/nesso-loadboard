@@ -67,8 +67,14 @@ function readCookie(request: Request, name: string): string | null {
   return null
 }
 
+/**
+ * An Editor and an Admin each own the workspace keyed by their own user id; a
+ * Viewer borrows the one it is bound to. Admin used to return null — account
+ * management and nothing else — but it is now a superuser: the same data access
+ * an Editor has, plus the account registry.
+ */
 function effectiveWorkspaceId(role: Role, userId: string, workspaceOwnerId: string | null): string | null {
-  if (role === 'editor') return userId
+  if (role === 'editor' || role === 'admin') return userId
   if (role === 'viewer') return workspaceOwnerId
   return null
 }

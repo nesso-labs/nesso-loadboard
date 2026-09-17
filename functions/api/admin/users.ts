@@ -51,11 +51,12 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
 
   let workspaceOwnerId: string | null = null
   if (role === 'viewer') {
-    if (!body.workspaceOwnerId) return badRequest('un Viewer deve essere associato a un Editor')
-    const owner = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND role = 'editor'")
+    if (!body.workspaceOwnerId) return badRequest('un Viewer deve essere associato a un Editor o a un Admin')
+    // Admins own a workspace too, so they are equally valid owners to bind to.
+    const owner = await env.DB.prepare("SELECT id FROM users WHERE id = ? AND role IN ('editor','admin')")
       .bind(body.workspaceOwnerId)
       .first()
-    if (!owner) return badRequest('editor non trovato')
+    if (!owner) return badRequest('proprietario del workspace non trovato')
     workspaceOwnerId = body.workspaceOwnerId
   }
 
