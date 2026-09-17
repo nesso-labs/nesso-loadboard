@@ -17,7 +17,7 @@ import { formatNumber } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useRpeBySessionQuery, useSegmentsByPlayerQuery, useSettingsQuery } from '../state/queries'
-import type { DrillSegment } from '../types/domain'
+import { TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
   'valid-cycles': 'vs media dei microcicli storici completi (Ripresa+Forza+Metabolico+Rifinitura)',
@@ -42,6 +42,13 @@ interface TrendMetricSpec {
   label: string
   unit: string
   getValue: (s: DrillSegment) => number
+}
+
+/** Training rows show date + training type (the generic import label isn't useful on its own); matches keep their opponent-based label. */
+function sessionHistoryLabel(session: Session): string {
+  if (session.type !== 'training') return session.label
+  const typeLabel = session.trainingType ? TRAINING_TYPE_LABEL[session.trainingType] : 'Non classificato'
+  return `${session.date} — ${typeLabel}`
 }
 
 export function PlayerProfilePage() {
@@ -372,7 +379,7 @@ export function PlayerProfilePage() {
                         />
                       </td>
                       <td className="px-4 py-2 tabular-nums text-ink">{r.session.date}</td>
-                      <td className="px-4 py-2 text-ink-secondary">{r.session.label}</td>
+                      <td className="px-4 py-2 text-ink-secondary">{sessionHistoryLabel(r.session)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-ink">
                         {r.segment.totalDistanceM.toFixed(0)}
                       </td>
