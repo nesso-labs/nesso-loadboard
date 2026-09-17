@@ -12,3 +12,7 @@ export function badRequest(message: string): Response {
 export function notFound(message = 'Not found'): Response {
   return json({ error: message }, { status: 404 })
 }
+
+export function forbidden(message = 'Forbidden'): Response {
+  return json({ error: message }, { status: 403 })
+}

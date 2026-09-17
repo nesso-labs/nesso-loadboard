@@ -110,3 +110,70 @@ export async function getSettings(): Promise<AppSettings> {
 export async function putSettings(settings: AppSettings): Promise<void> {
   await apiFetch('/api/settings', { method: 'PUT', body: JSON.stringify(settings) })
 }
+
+// ---------- auth ----------
+
+export type Role = 'viewer' | 'editor' | 'admin'
+
+export interface CurrentUser {
+  id: string
+  email: string
+  role: Role
+}
+
+export async function getCurrentUser(): Promise<CurrentUser> {
+  return apiFetch<CurrentUser>('/api/auth/me')
+}
+
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiFetch('/api/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) })
+}
+
+// ---------- admin ----------
+
+export interface AdminUser {
+  id: string
+  email: string
+  role: Role
+  workspaceOwnerId: string | null
+  active: boolean
+  createdAt: string
+  lastLoginAt: string | null
+}
+
+export async function adminListUsers(): Promise<AdminUser[]> {
+  return apiFetch<AdminUser[]>('/api/admin/users')
+}
+
+export async function adminCreateUser(input: {
+  email: string
+  password: string
+  role: Role
+  workspaceOwnerId?: string | null
+}): Promise<AdminUser> {
+  return apiFetch<AdminUser>('/api/admin/users', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function adminUpdateUser(
+  id: string,
+  patch: { role?: Role; active?: boolean; newPassword?: string; workspaceOwnerId?: string | null },
+): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
+export interface LoginAuditEntry {
+  id: string
+  userId: string | null
+  email: string
+  success: boolean
+  userAgent: string | null
+  createdAt: string
+}
+
+export async function adminListLoginAudit(userId?: string): Promise<LoginAuditEntry[]> {
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : ''
+  return apiFetch<LoginAuditEntry[]>(`/api/admin/login-audit${qs}`)
+}

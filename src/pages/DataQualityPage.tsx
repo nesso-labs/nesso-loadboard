@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { EmptyState } from '../components/ui/EmptyState'
 import { putPlayer } from '../lib/db/repo'
 import { evaluatePlayerPb, type PbStatus } from '../lib/metrics/pb'
+import { useAuth } from '../state/AuthContext'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { queryKeys, usePlayersQuery, useSegmentsBySessionQuery } from '../state/queries'
 import type { Player } from '../types/domain'
@@ -26,6 +27,7 @@ export function DataQualityPage() {
   const { currentSession } = useCurrentSession()
   const { data: segments = [], isLoading: loadingSegments } = useSegmentsBySessionQuery(currentSession?.id)
   const { data: players = [] } = usePlayersQuery()
+  const { canEdit } = useAuth()
   const queryClient = useQueryClient()
 
   const playerById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
@@ -147,13 +149,15 @@ export function DataQualityPage() {
                         <p className="text-ink-secondary">{evaluation.message}</p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => confirmPb.mutate(player)}
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-ink/5"
-                    >
-                      <Check className="size-3.5" /> Conferma
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => confirmPb.mutate(player)}
+                        className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+                      >
+                        <Check className="size-3.5" /> Conferma
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

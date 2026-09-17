@@ -1,32 +1,56 @@
-import { hasValidSession, loginPage, misconfigured, safeReturnPath } from './_lib/auth'
-import { json } from './_lib/json'
+import { loginPage, resolveSession, safeReturnPath, type AppData } from './_lib/auth'
+import { forbidden, json } from './_lib/json'
 import type { Env } from './_lib/mappers'
 
 /**
- * Whole-site password gate.
+ * Whole-site auth gate.
  *
  * A root-level `_middleware.ts` runs ahead of static assets on every path, so
  * this covers the SPA shell, the JS/CSS bundle and the D1-backed API alike —
- * there is no route that reaches a client-side check first. (Keep it that way:
- * adding a `_routes.json` that excludes paths would punch a hole straight
- * through this.)
+ * there is no route that reaches a client-side check first. (Keep it that
+ * way: adding a `_routes.json` that excludes paths would punch a hole
+ * straight through this.)
+ *
+ * Beyond "is this a valid, active session", every /api/* request is also
+ * checked against a role policy here — one chokepoint, not a check
+ * duplicated in every handler:
+ *   - /api/admin/*        → admin only (account management, login registry)
+ *   - /api/auth/me|password → any signed-in user (self-service)
+ *   - everything else      → editor/viewer only; viewer is read-only (GET)
+ *
+ * Admins never reach the second bucket — they have no workspace, so there is
+ * nothing there for them to read or write. The SPA shell itself (non-/api/
+ * paths) is only gated on "signed in" — which screen renders for which role
+ * is a client-side routing concern (see src/App.tsx), since Pages serves the
+ * same bundle for every path in a client-routed app.
  */
 const PUBLIC_PATHS = new Set(['/api/auth/login', '/api/auth/logout', '/favicon.svg'])
+const SELF_SERVICE_AUTH_PATHS = new Set(['/api/auth/me', '/api/auth/password'])
 
-export const onRequest: PagesFunction<Env> = async ({ request, env, next }) => {
+export const onRequest: PagesFunction<Env, string, AppData> = async ({ request, env, next, data }) => {
   const url = new URL(request.url)
 
   // The login endpoint has to stay reachable or there is no way back in.
   if (PUBLIC_PATHS.has(url.pathname)) return next()
 
-  if (!env.SITE_PASSWORD) return misconfigured()
-  if (await hasValidSession(request, env.SITE_PASSWORD)) return next()
+  const auth = await resolveSession(request, env)
 
-  // An unauthenticated XHR should fail as data, not as a login page the
-  // fetch caller would try to parse as JSON.
-  if (url.pathname.startsWith('/api/')) {
-    return json({ error: 'unauthorized' }, { status: 401, headers: { 'cache-control': 'no-store' } })
+  if (!auth) {
+    // An unauthenticated XHR should fail as data, not as a login page the
+    // fetch caller would try to parse as JSON.
+    if (url.pathname.startsWith('/api/')) {
+      return json({ error: 'unauthorized' }, { status: 401, headers: { 'cache-control': 'no-store' } })
+    }
+    return loginPage(safeReturnPath(url.pathname + url.search))
   }
 
-  return loginPage(safeReturnPath(url.pathname + url.search))
+  if (url.pathname.startsWith('/api/admin/')) {
+    if (auth.role !== 'admin') return forbidden()
+  } else if (!SELF_SERVICE_AUTH_PATHS.has(url.pathname) && url.pathname.startsWith('/api/')) {
+    if (auth.role === 'admin') return forbidden()
+    if (auth.role === 'viewer' && request.method !== 'GET') return forbidden()
+  }
+
+  data.auth = auth
+  return next()
 }

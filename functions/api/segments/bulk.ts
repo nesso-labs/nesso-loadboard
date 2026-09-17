@@ -1,15 +1,17 @@
+import type { AppData } from '../../_lib/auth'
 import { badRequest, json } from '../../_lib/json'
 import { type Env, segmentToRow } from '../../_lib/mappers'
+import { ensureColumns } from '../../_lib/schema'
 import type { DrillSegment } from '../../../src/types/domain'
 
 const UPSERT_SQL = `
   INSERT INTO segments (
-    id, session_id, player_id, drill_title, segment_kind, duration_sec, total_distance_m,
+    id, workspace_id, session_id, player_id, drill_title, segment_kind, duration_sec, total_distance_m,
     distance_per_min, distance_zone4_m, distance_zone5_m, distance_zone6_m, entries_zone5,
     entries_zone6, hsr_m, hsr_per_min, max_speed_kmh, pct_max_speed, acc_zone3, dec_zone3,
     acc_zone4, dec_zone4, acc_zone5, dec_zone5, acc_zone6, dec_zone6, acc_per_min, dec_per_min,
     dropped_duplicates, warnings, is_synthesized_full_session
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET
     drill_title = excluded.drill_title, segment_kind = excluded.segment_kind,
     duration_sec = excluded.duration_sec, total_distance_m = excluded.total_distance_m,
@@ -23,14 +25,21 @@ const UPSERT_SQL = `
     acc_per_min = excluded.acc_per_min, dec_per_min = excluded.dec_per_min,
     dropped_duplicates = excluded.dropped_duplicates, warnings = excluded.warnings,
     is_synthesized_full_session = excluded.is_synthesized_full_session
+  WHERE segments.workspace_id = excluded.workspace_id
 `
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ request, env, data }) => {
   const segments = (await request.json()) as DrillSegment[]
   if (!Array.isArray(segments) || segments.length === 0) return badRequest('expected a non-empty array of segments')
 
+  await ensureColumns(env, 'segments', [{ name: 'workspace_id', type: 'TEXT' }])
+
+  const workspaceId = data.auth.workspaceId
   const stmt = env.DB.prepare(UPSERT_SQL)
-  const batch = segments.map((s) => stmt.bind(...segmentToRow(s)))
+  const batch = segments.map((s) => {
+    const row = segmentToRow(s)
+    return stmt.bind(row[0], workspaceId, ...row.slice(1))
+  })
   await env.DB.batch(batch)
 
   return json({ inserted: segments.length }, { status: 201 })

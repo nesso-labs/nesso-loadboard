@@ -5,6 +5,7 @@ import { ImportWizard } from '../import/ImportWizard'
 import { EmptyState } from '../components/ui/EmptyState'
 import { buildRpeEntries } from '../lib/csv/importSession'
 import { deleteSession, putRpeEntries, putSession } from '../lib/db/repo'
+import { useAuth } from '../state/AuthContext'
 import {
   useInvalidateAfterImport,
   useInvalidateRpe,
@@ -32,7 +33,7 @@ const MATCH_LOCATIONS: MatchLocation[] = ['home', 'away', 'away_2d']
 
 type Panel = 'none' | 'edit' | 'rpe'
 
-function SessionRow({ session }: { session: Session }) {
+function SessionRow({ session, canEdit }: { session: Session; canEdit: boolean }) {
   const { data: rpe = [] } = useRpeBySessionQuery(session.id)
   const { data: players = [] } = usePlayersQuery()
   const invalidateAfterDelete = useInvalidateAfterImport()
@@ -165,30 +166,34 @@ function SessionRow({ session }: { session: Session }) {
         </td>
         <td className="px-4 py-2 text-xs text-ink-muted">{rpe.length > 0 ? `RPE: ${rpe.length}` : 'RPE mancante'}</td>
         <td className="px-4 py-2">
-          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-            <button
-              type="button"
-              onClick={toggleEdit}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
-            >
-              <Pencil className="size-3.5" /> Tipo
-            </button>
-            <button
-              type="button"
-              onClick={toggleRpe}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
-            >
-              <Gauge className="size-3.5" /> RPE
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10 disabled:opacity-60"
-            >
-              <Trash2 className="size-3.5" /> {deleting ? 'Eliminazione…' : 'Elimina'}
-            </button>
-          </div>
+          {canEdit ? (
+            <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+              <button
+                type="button"
+                onClick={toggleEdit}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
+              >
+                <Pencil className="size-3.5" /> Tipo
+              </button>
+              <button
+                type="button"
+                onClick={toggleRpe}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-secondary hover:bg-ink/5"
+              >
+                <Gauge className="size-3.5" /> RPE
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10 disabled:opacity-60"
+              >
+                <Trash2 className="size-3.5" /> {deleting ? 'Eliminazione…' : 'Elimina'}
+              </button>
+            </div>
+          ) : (
+            <span className="block text-right text-xs text-ink-muted">—</span>
+          )}
         </td>
       </tr>
 
@@ -347,10 +352,11 @@ function SessionRow({ session }: { session: Session }) {
 
 export function SessionsPage() {
   const { data: sessions = [], isLoading } = useSessionsQuery()
+  const { canEdit } = useAuth()
   const [importing, setImporting] = useState(false)
   const navigate = useNavigate()
 
-  if (importing) {
+  if (importing && canEdit) {
     return (
       <ImportWizard
         onClose={() => {
@@ -368,13 +374,15 @@ export function SessionsPage() {
           Storico delle sessioni importate in questo browser. Da qui puoi anche cambiarne la tipologia, correggere
           l'RPE o eliminarle.
         </p>
-        <button
-          type="button"
-          onClick={() => setImporting(true)}
-          className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
-        >
-          <Upload className="size-4" /> Nuovo import
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setImporting(true)}
+            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
+          >
+            <Upload className="size-4" /> Nuovo import
+          </button>
+        )}
       </div>
 
       {isLoading ? null : sessions.length === 0 ? (
@@ -399,7 +407,7 @@ export function SessionsPage() {
             </thead>
             <tbody>
               {sessions.map((s) => (
-                <SessionRow key={s.id} session={s} />
+                <SessionRow key={s.id} session={s} canEdit={canEdit} />
               ))}
             </tbody>
           </table>

@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { putSettings } from '../lib/db/repo'
+import { useAuth } from '../state/AuthContext'
 import { queryKeys, useSettingsQuery } from '../state/queries'
 import type { AppSettings, ZoneNumber } from '../types/domain'
 
@@ -40,6 +41,7 @@ function ZoneCheckboxGroup({
 
 export function SettingsPage() {
   const { data: settings } = useSettingsQuery()
+  const { canEdit } = useAuth()
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<AppSettings | null>(null)
   const [saved, setSaved] = useState(false)
@@ -62,9 +64,10 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <fieldset disabled={!canEdit} className="flex max-w-2xl flex-col gap-6 border-0 p-0">
       <p className="text-sm text-ink-secondary">
         Soglie usate da tutte le pagine (Drills, Alerts, Session v Game, Leaderboard). Nessun valore è hardcoded.
+        {!canEdit && ' Sola lettura per il tuo ruolo.'}
       </p>
 
       <section className="flex flex-col gap-3 panel p-4">
@@ -248,6 +251,6 @@ export function SettingsPage() {
         </button>
         {saved && <span className="text-xs text-status-good">Salvato.</span>}
       </div>
-    </div>
+    </fieldset>
   )
 }

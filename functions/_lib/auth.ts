@@ -1,55 +1,59 @@
+import type { Env } from './mappers'
+
 /**
- * Site-wide password gate (single-user deployment).
+ * Multi-user auth: email + password accounts with three roles, backed by D1.
  *
- * The session cookie is `<expiry>.<hmac>`, signed with the site password
- * itself. That means there is no second secret to provision, and rotating the
- * password invalidates every outstanding session for free.
+ * Session tokens are opaque and random — the cookie carries the raw token,
+ * D1 stores only its SHA-256 hash (`auth_sessions.token_hash`), so a leaked
+ * database dump never hands out valid sessions. This also means sessions are
+ * revocable server-side (logout deletes the row; deactivating a user makes
+ * every one of their sessions fail the next lookup), unlike the old
+ * single-password scheme where the password itself was the signing key.
  *
- * `__Host-` prefix is not decoration here: the site is served on
+ * `__Host-` prefix is not decoration: the site is served on
  * nesso-loadboard.pages.dev, so every OTHER Pages project in the world is a
  * sibling subdomain of pages.dev and could set a `Domain=pages.dev` cookie
- * that our origin would receive. Browsers refuse to accept a `__Host-` cookie
- * carrying a Domain attribute, so a sibling cannot forge this one.
+ * our origin would receive. Browsers refuse a `__Host-` cookie carrying a
+ * Domain attribute, so a sibling cannot forge this one.
  */
 
-const COOKIE_NAME = '__Host-loadboard_session'
-const TOKEN_VERSION = 'v1'
+export type Role = 'viewer' | 'editor' | 'admin'
 
+export interface AuthContext {
+  userId: string
+  email: string
+  role: Role
+  /**
+   * The workspace this user's requests are scoped to. Editors own their own
+   * workspace (their user id); Viewers are bound to one Editor's workspace;
+   * Admins have none — they never touch workspace-scoped data, only account
+   * management and the login registry.
+   */
+  workspaceId: string | null
+}
+
+export interface AppData extends Record<string, unknown> {
+  auth: AuthContext
+}
+
+const COOKIE_NAME = '__Host-loadboard_session'
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30 // 30 days
 
 const encoder = new TextEncoder()
 
-async function sha256(value: string): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value)))
-}
-
-/**
- * Compares via fixed-length digests rather than the raw strings: `===` returns
- * early on the first differing byte (and on a length mismatch), which leaks
- * how much of a guess was correct.
- */
-export async function equalsConstantTime(a: string, b: string): Promise<boolean> {
-  const [da, db] = await Promise.all([sha256(a), sha256(b)])
-  let diff = 0
-  for (let i = 0; i < da.length; i++) diff |= da[i] ^ db[i]
-  return diff === 0
-}
-
-function base64url(buffer: ArrayBuffer): string {
+function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
-  for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte)
+  for (const byte of bytes) binary += String.fromCharCode(byte)
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-async function sign(password: string, payload: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  return base64url(await crypto.subtle.sign('HMAC', key, encoder.encode(payload)))
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value))
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function randomToken(): string {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(32)))
 }
 
 function readCookie(request: Request, name: string): string | null {
@@ -63,26 +67,69 @@ function readCookie(request: Request, name: string): string | null {
   return null
 }
 
-export async function createSessionCookie(password: string): Promise<string> {
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
-  const signature = await sign(password, `${TOKEN_VERSION}:${expiresAt}`)
-  return `${COOKIE_NAME}=${expiresAt}.${signature}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`
+function effectiveWorkspaceId(role: Role, userId: string, workspaceOwnerId: string | null): string | null {
+  if (role === 'editor') return userId
+  if (role === 'viewer') return workspaceOwnerId
+  return null
+}
+
+export async function createSession(env: Env, userId: string, userAgent: string | null): Promise<string> {
+  const token = randomToken()
+  const tokenHash = await sha256Hex(token)
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000)
+
+  await env.DB.prepare(
+    'INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at, last_seen_at, user_agent) VALUES (?, ?, ?, ?, ?, ?)',
+  )
+    .bind(tokenHash, userId, now.toISOString(), expiresAt.toISOString(), now.toISOString(), userAgent)
+    .run()
+
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`
 }
 
 export const CLEARED_SESSION_COOKIE = `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
 
-export async function hasValidSession(request: Request, password: string): Promise<boolean> {
+export async function resolveSession(request: Request, env: Env): Promise<AuthContext | null> {
   const token = readCookie(request, COOKIE_NAME)
-  if (!token) return false
+  if (!token) return null
+  const tokenHash = await sha256Hex(token)
 
-  const separator = token.indexOf('.')
-  if (separator === -1) return false
+  const row = await env.DB.prepare(
+    `SELECT s.expires_at as expires_at, u.id as id, u.email as email, u.role as role,
+            u.workspace_owner_id as workspace_owner_id, u.active as active
+     FROM auth_sessions s JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ?`,
+  )
+    .bind(tokenHash)
+    .first<Record<string, unknown>>()
 
-  const expiresAt = Number(token.slice(0, separator))
-  if (!Number.isSafeInteger(expiresAt) || expiresAt * 1000 <= Date.now()) return false
+  if (!row || !row.active) return null
+  if (new Date(row.expires_at as string).getTime() <= Date.now()) return null
 
-  const expected = await sign(password, `${TOKEN_VERSION}:${expiresAt}`)
-  return equalsConstantTime(token.slice(separator + 1), expected)
+  try {
+    await env.DB.prepare('UPDATE auth_sessions SET last_seen_at = ? WHERE token_hash = ?')
+      .bind(new Date().toISOString(), tokenHash)
+      .run()
+  } catch {
+    // Best-effort activity timestamp — never fail the request over it.
+  }
+
+  const role = row.role as Role
+  const userId = row.id as string
+  return {
+    userId,
+    email: row.email as string,
+    role,
+    workspaceId: effectiveWorkspaceId(role, userId, (row.workspace_owner_id as string | null) ?? null),
+  }
+}
+
+export async function destroySession(request: Request, env: Env): Promise<void> {
+  const token = readCookie(request, COOKIE_NAME)
+  if (!token) return
+  const tokenHash = await sha256Hex(token)
+  await env.DB.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').bind(tokenHash).run()
 }
 
 /**
@@ -112,7 +159,7 @@ function escapeHtml(value: string): string {
  * same reason. Keep the two in step: the brand blue carries identity, the
  * yellow is reserved for the call to action.
  */
-export function loginPage(returnPath: string, error?: string): Response {
+export function loginPage(returnPath: string, prefillEmail = '', error?: string): Response {
   const html = `<!doctype html>
 <html lang="it">
 <head>
@@ -172,8 +219,9 @@ export function loginPage(returnPath: string, error?: string): Response {
     border: 1px solid var(--border); border-radius: 6px;
   }
   input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .field { margin-bottom: 14px; }
   button {
-    width: 100%; margin-top: 18px; padding: 11px 12px; font: inherit;
+    width: 100%; margin-top: 4px; padding: 11px 12px; font: inherit;
     font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 6px;
     color: var(--accent-ink); background: var(--accent); border: 0;
     box-shadow: var(--cta-glow); transition: opacity 0.15s;
@@ -188,13 +236,19 @@ export function loginPage(returnPath: string, error?: string): Response {
 <body>
   <main>
     <h1>LoadBoard</h1>
-    <p class="sub">Accesso riservato. Inserisci la password per continuare.</p>
+    <p class="sub">Accesso riservato. Inserisci le tue credenziali per continuare.</p>
     ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
     <form method="POST" action="/api/auth/login">
       <input type="hidden" name="next" value="${escapeHtml(returnPath)}" />
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password"
-             autofocus required />
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" value="${escapeHtml(prefillEmail)}"
+               autofocus required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
       <button type="submit">Entra</button>
     </form>
   </main>
@@ -209,12 +263,4 @@ export function loginPage(returnPath: string, error?: string): Response {
       'cache-control': 'no-store',
     },
   })
-}
-
-/** The gate cannot enforce anything without the secret — refuse, loudly. */
-export function misconfigured(): Response {
-  return new Response(
-    'SITE_PASSWORD is not configured for this deployment. The site stays closed until it is set.',
-    { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } },
-  )
 }

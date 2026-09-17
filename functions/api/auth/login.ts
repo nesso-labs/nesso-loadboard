@@ -1,34 +1,48 @@
-import {
-  createSessionCookie,
-  equalsConstantTime,
-  loginPage,
-  misconfigured,
-  safeReturnPath,
-} from '../../_lib/auth'
+import { createSession, loginPage, safeReturnPath } from '../../_lib/auth'
 import type { Env } from '../../_lib/mappers'
+import { verifyPassword } from '../../_lib/passwords'
 
-/** Blunt brute-force tax. One user, one password — a slow guess is a dead guess. */
+/** Blunt brute-force tax: a slow guess is a dead guess. */
 const FAILED_ATTEMPT_DELAY_MS = 500
 
+interface UserRow {
+  id: string
+  email: string
+  password_hash: string
+  active: number
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  if (!env.SITE_PASSWORD) return misconfigured()
-
   const form = await request.formData()
-  const submitted = String(form.get('password') ?? '')
+  const email = String(form.get('email') ?? '').trim().toLowerCase()
+  const password = String(form.get('password') ?? '')
   const returnPath = safeReturnPath(String(form.get('next') ?? '/'))
+  const userAgent = request.headers.get('user-agent')
 
-  if (!(await equalsConstantTime(submitted, env.SITE_PASSWORD))) {
+  const user = await env.DB.prepare('SELECT id, email, password_hash, active FROM users WHERE email = ? COLLATE NOCASE')
+    .bind(email)
+    .first<UserRow>()
+
+  const passwordOk = user ? await verifyPassword(password, user.password_hash) : false
+  const active = user ? Boolean(user.active) : false
+  const success = passwordOk && active
+
+  await env.DB.prepare(
+    'INSERT INTO login_audit (id, user_id, email_attempted, success, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+  )
+    .bind(crypto.randomUUID(), user?.id ?? null, email, success ? 1 : 0, userAgent, new Date().toISOString())
+    .run()
+
+  if (!success) {
     await new Promise((resolve) => setTimeout(resolve, FAILED_ATTEMPT_DELAY_MS))
-    return loginPage(returnPath, 'Password errata.')
+    return loginPage(returnPath, email, 'Email o password errati.')
   }
 
-  // 303 so the browser re-issues the follow-up as a GET rather than
-  // re-POSTing the password on refresh.
   return new Response(null, {
     status: 303,
     headers: {
       location: returnPath,
-      'set-cookie': await createSessionCookie(env.SITE_PASSWORD),
+      'set-cookie': await createSession(env, user!.id, userAgent),
       'cache-control': 'no-store',
     },
   })

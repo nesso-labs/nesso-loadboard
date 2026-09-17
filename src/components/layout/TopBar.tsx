@@ -1,8 +1,82 @@
-import { ChevronDown, LogOut, Menu, Printer, Upload } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { ChevronDown, KeyRound, LogOut, Menu, Printer, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { changeOwnPassword } from '../../lib/db/repo'
+import { useAuth } from '../../state/AuthContext'
 import { useCurrentSession } from '../../state/CurrentSessionContext'
 import { NAV_ITEMS } from './navItems'
+
+function ChangePasswordButton() {
+  const [open, setOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => changeOwnPassword(currentPassword, newPassword),
+    onSuccess: () => {
+      setCurrentPassword('')
+      setNewPassword('')
+      setOpen(false)
+    },
+  })
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Cambia password"
+        className="hidden items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5 md:flex"
+      >
+        <KeyRound className="size-3.5" />
+      </button>
+      {open && (
+        <>
+          <button type="button" aria-label="Chiudi" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              mutation.mutate()
+            }}
+            className="panel absolute right-0 top-full z-50 mt-2 w-64 p-3"
+          >
+            <p className="mb-2 text-xs font-medium text-ink">Cambia password</p>
+            <label className="mb-2 flex flex-col gap-1 text-xs">
+              <span className="text-ink-secondary">Password attuale</span>
+              <input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="rounded-md border border-border bg-page px-2 py-1.5 text-sm text-ink"
+              />
+            </label>
+            <label className="mb-2 flex flex-col gap-1 text-xs">
+              <span className="text-ink-secondary">Nuova password (min. 8 caratteri)</span>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="rounded-md border border-border bg-page px-2 py-1.5 text-sm text-ink"
+              />
+            </label>
+            {mutation.isError && <p className="mb-2 text-xs text-status-critical">{(mutation.error as Error).message}</p>}
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+            >
+              {mutation.isPending ? 'Salvataggio…' : 'Salva'}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  )
+}
 
 function useCurrentPageLabel(): string {
   const { pathname } = useLocation()
@@ -13,6 +87,7 @@ function useCurrentPageLabel(): string {
 export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const pageLabel = useCurrentPageLabel()
   const { sessions, currentSessionId, currentSession, setCurrentSessionId } = useCurrentSession()
+  const { user, canEdit } = useAuth()
   const [pickerOpen, setPickerOpen] = useState(false)
 
   return (
@@ -74,14 +149,22 @@ export function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
           Stampa / PDF
         </button>
 
-        <Link
-          to="/sessions"
-          aria-label="Importa sessione"
-          className="glow-accent flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-accent-ink transition-opacity hover:opacity-90 sm:px-3"
-        >
-          <Upload className="size-3.5" />
-          <span className="hidden sm:inline">Importa sessione</span>
-        </Link>
+        {canEdit && (
+          <Link
+            to="/sessions"
+            aria-label="Importa sessione"
+            className="glow-accent flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-2 py-1.5 text-xs font-semibold text-accent-ink transition-opacity hover:opacity-90 sm:px-3"
+          >
+            <Upload className="size-3.5" />
+            <span className="hidden sm:inline">Importa sessione</span>
+          </Link>
+        )}
+
+        <span className="hidden max-w-32 truncate text-xs text-ink-muted lg:inline" title={user?.email}>
+          {user?.email}
+        </span>
+
+        <ChangePasswordButton />
 
         <form method="POST" action="/api/auth/logout" className="shrink-0">
           <button

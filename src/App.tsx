@@ -1,6 +1,7 @@
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { AlertsPage } from './pages/AlertsPage'
+import { AdminPage } from './pages/AdminPage'
 import { ComparePage } from './pages/ComparePage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { DrillsPage } from './pages/DrillsPage'
@@ -14,9 +15,28 @@ import { SessionsPage } from './pages/SessionsPage'
 import { SessionVGamePage } from './pages/SessionVGamePage'
 import { SessionVSessionPage } from './pages/SessionVSessionPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { useAuth } from './state/AuthContext'
 import { WeeklyRunningPage } from './pages/WeeklyRunningPage'
 
 export function App() {
+  const { user, isLoading, isAdmin } = useAuth()
+
+  // The auth cookie already gates every request server-side — this is just
+  // "don't flash the wrong screen" while /api/auth/me resolves.
+  if (isLoading || !user) return null
+
+  // Admin has no workspace of its own: account management + the login
+  // registry only, never the data pages (enforced again server-side in
+  // _middleware.ts — this is the UX side of that boundary).
+  if (isAdmin) {
+    return (
+      <Routes>
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
       <Route element={<AppLayout />}>
@@ -36,6 +56,7 @@ export function App() {
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
+      <Route path="/admin" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

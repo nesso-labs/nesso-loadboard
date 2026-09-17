@@ -1,13 +1,17 @@
+import type { AppData } from '../../_lib/auth'
 import { badRequest, json, notFound } from '../../_lib/json'
 import { type Env, rowToPlayer } from '../../_lib/mappers'
 import { ensureColumns } from '../../_lib/schema'
 import type { Player } from '../../../src/types/domain'
 
-export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params }) => {
+export const onRequestPatch: PagesFunction<Env, string, AppData> = async ({ request, env, params, data }) => {
   const id = params.id as string
+  const workspaceId = data.auth.workspaceId
   const patch = (await request.json()) as Partial<Player>
 
-  const existing = await env.DB.prepare('SELECT * FROM players WHERE id = ?').bind(id).first<Record<string, unknown>>()
+  const existing = await env.DB.prepare('SELECT * FROM players WHERE id = ? AND workspace_id = ?')
+    .bind(id, workspaceId)
+    .first<Record<string, unknown>>()
   if (!existing) return notFound('player not found')
 
   const current = rowToPlayer(existing)
@@ -54,9 +58,9 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   if (sets.length === 0) return badRequest('nothing to update')
 
   sets.push('updated_at = ?')
-  values.push(updated.updatedAt, id)
+  values.push(updated.updatedAt, id, workspaceId)
 
-  await env.DB.prepare(`UPDATE players SET ${sets.join(', ')} WHERE id = ?`)
+  await env.DB.prepare(`UPDATE players SET ${sets.join(', ')} WHERE id = ? AND workspace_id = ?`)
     .bind(...values)
     .run()
 

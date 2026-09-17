@@ -4,6 +4,7 @@ import { putPlayer } from '../lib/db/repo'
 import { evaluatePlayerPb } from '../lib/metrics/pb'
 import type { Player, Position } from '../types/domain'
 import { EmptyState } from '../components/ui/EmptyState'
+import { useAuth } from '../state/AuthContext'
 import { queryKeys, usePlayersQuery } from '../state/queries'
 
 const POSITIONS: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
@@ -18,6 +19,7 @@ const POSITION_LABEL: Record<Position, string> = {
 
 export function RosterPage() {
   const { data: players = [], isLoading } = usePlayersQuery()
+  const { canEdit } = useAuth()
   const queryClient = useQueryClient()
 
   const updatePlayer = useMutation({
@@ -62,6 +64,7 @@ export function RosterPage() {
                 <td className="px-4 py-2">
                   <select
                     value={player.position}
+                    disabled={!canEdit}
                     onChange={(e) =>
                       updatePlayer.mutate({
                         ...player,
@@ -69,7 +72,7 @@ export function RosterPage() {
                         updatedAt: new Date().toISOString(),
                       })
                     }
-                    className="rounded-md border border-border bg-page px-2 py-1 text-sm text-ink"
+                    className="rounded-md border border-border bg-page px-2 py-1 text-sm text-ink disabled:opacity-60"
                   >
                     {POSITIONS.map((p) => (
                       <option key={p} value={p}>
@@ -84,6 +87,7 @@ export function RosterPage() {
                     min={0}
                     step="0.1"
                     value={player.heightCm ?? ''}
+                    disabled={!canEdit}
                     onChange={(e) =>
                       updatePlayer.mutate({
                         ...player,
@@ -91,7 +95,7 @@ export function RosterPage() {
                         updatedAt: new Date().toISOString(),
                       })
                     }
-                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink"
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -100,6 +104,7 @@ export function RosterPage() {
                     min={0}
                     step="0.1"
                     value={player.weightKg ?? ''}
+                    disabled={!canEdit}
                     onChange={(e) =>
                       updatePlayer.mutate({
                         ...player,
@@ -107,7 +112,7 @@ export function RosterPage() {
                         updatedAt: new Date().toISOString(),
                       })
                     }
-                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink"
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
                   />
                 </td>
                 <td className="px-4 py-2">
@@ -123,7 +128,7 @@ export function RosterPage() {
                             <span className="rounded-full bg-status-good/15 px-2 py-0.5 font-medium text-status-good">
                               Confermato
                             </span>
-                          ) : (
+                          ) : canEdit ? (
                             <button
                               type="button"
                               title={evaluation.message}
@@ -132,6 +137,13 @@ export function RosterPage() {
                             >
                               <Check className="size-3" /> Conferma
                             </button>
+                          ) : (
+                            <span
+                              title={evaluation.message}
+                              className="rounded-full bg-status-warning/20 px-2 py-0.5 font-medium text-ink"
+                            >
+                              Da confermare
+                            </span>
                           )}
                         </div>
                       )
@@ -142,6 +154,7 @@ export function RosterPage() {
                   <input
                     type="checkbox"
                     checked={player.active}
+                    disabled={!canEdit}
                     onChange={(e) =>
                       updatePlayer.mutate({
                         ...player,
@@ -149,7 +162,7 @@ export function RosterPage() {
                         updatedAt: new Date().toISOString(),
                       })
                     }
-                    className="size-4 accent-accent"
+                    className="size-4 accent-accent disabled:opacity-60"
                   />
                 </td>
               </tr>
