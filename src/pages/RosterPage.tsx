@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { putPlayer } from '../lib/db/repo'
 import { evaluatePlayerPb } from '../lib/metrics/pb'
 import type { Player, Position } from '../types/domain'
@@ -15,6 +16,65 @@ const POSITION_LABEL: Record<Position, string> = {
   MID: 'Centrocampista',
   FWD: 'Attaccante',
   UNSPECIFIED: 'Non assegnato',
+}
+
+/** Only NN.NN — up to 2 integer digits and up to 2 decimal digits, typed freely (no spinner). */
+const SPRINT_TIME_PATTERN = /^\d{0,2}(\.\d{0,2})?$/
+
+function SprintTimeCell({
+  value,
+  canEdit,
+  onConfirm,
+}: {
+  value: number | undefined
+  canEdit: boolean
+  onConfirm: (value: number | undefined) => void
+}) {
+  const [draft, setDraft] = useState(value !== undefined ? value.toFixed(2) : '')
+
+  // Stay in sync if the row's value changes from elsewhere (e.g. another tab/device).
+  useEffect(() => {
+    setDraft(value !== undefined ? value.toFixed(2) : '')
+  }, [value])
+
+  const confirm = () => {
+    if (draft.trim() === '') {
+      onConfirm(undefined)
+      return
+    }
+    const parsed = Number(draft)
+    if (!Number.isNaN(parsed)) onConfirm(parsed)
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder="0.00"
+        disabled={!canEdit}
+        value={draft}
+        onChange={(e) => {
+          if (SPRINT_TIME_PATTERN.test(e.target.value)) setDraft(e.target.value)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') confirm()
+        }}
+        className="w-16 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
+      />
+      {canEdit && (
+        <button
+          type="button"
+          onClick={confirm}
+          aria-label="Conferma il valore"
+          title="Conferma il valore"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border text-ink-secondary hover:bg-ink/5"
+        >
+          <Check className="size-3.5" />
+        </button>
+      )}
+    </div>
+  )
 }
 
 export function RosterPage() {
@@ -153,37 +213,21 @@ export function RosterPage() {
                   )}
                 </td>
                 <td className="px-4 py-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={player.sprint10mSec ?? ''}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      updatePlayer.mutate({
-                        ...player,
-                        sprint10mSec: e.target.value === '' ? undefined : Number(e.target.value),
-                        updatedAt: new Date().toISOString(),
-                      })
+                  <SprintTimeCell
+                    value={player.sprint10mSec}
+                    canEdit={canEdit}
+                    onConfirm={(v) =>
+                      updatePlayer.mutate({ ...player, sprint10mSec: v, updatedAt: new Date().toISOString() })
                     }
-                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
                   />
                 </td>
                 <td className="px-4 py-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={player.sprint30mSec ?? ''}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      updatePlayer.mutate({
-                        ...player,
-                        sprint30mSec: e.target.value === '' ? undefined : Number(e.target.value),
-                        updatedAt: new Date().toISOString(),
-                      })
+                  <SprintTimeCell
+                    value={player.sprint30mSec}
+                    canEdit={canEdit}
+                    onConfirm={(v) =>
+                      updatePlayer.mutate({ ...player, sprint30mSec: v, updatedAt: new Date().toISOString() })
                     }
-                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
                   />
                 </td>
                 <td className="px-4 py-2">
