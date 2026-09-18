@@ -54,6 +54,8 @@ export function RosterPage() {
               <th className="px-4 py-2">Altezza (cm)</th>
               <th className="px-4 py-2">Peso (kg)</th>
               <th className="px-4 py-2">Vmax personale</th>
+              <th className="px-4 py-2">Sprint 10m (s)</th>
+              <th className="px-4 py-2">Sprint 30m (s)</th>
               <th className="px-4 py-2">Attivo</th>
             </tr>
           </thead>
@@ -149,6 +151,40 @@ export function RosterPage() {
                       )
                     })()
                   )}
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={player.sprint10mSec ?? ''}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      updatePlayer.mutate({
+                        ...player,
+                        sprint10mSec: e.target.value === '' ? undefined : Number(e.target.value),
+                        updatedAt: new Date().toISOString(),
+                      })
+                    }
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
+                  />
+                </td>
+                <td className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={player.sprint30mSec ?? ''}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      updatePlayer.mutate({
+                        ...player,
+                        sprint30mSec: e.target.value === '' ? undefined : Number(e.target.value),
+                        updatedAt: new Date().toISOString(),
+                      })
+                    }
+                    className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
+                  />
                 </td>
                 <td className="px-4 py-2">
                   <input

@@ -190,6 +190,16 @@ export function PlayerProfilePage() {
             {player.weightKg.toFixed(1)} kg
           </span>
         )}
+        {player?.sprint10mSec !== undefined && (
+          <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
+            Sprint 10m: {player.sprint10mSec.toFixed(2)}s
+          </span>
+        )}
+        {player?.sprint30mSec !== undefined && (
+          <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
+            Sprint 30m: {player.sprint30mSec.toFixed(2)}s
+          </span>
+        )}
       </div>
 
       {loadingSegments ? null : sessionCount === 0 ? (

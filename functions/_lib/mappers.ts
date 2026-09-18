@@ -60,6 +60,8 @@ export function rowToPlayer(r: Record<string, unknown>): Player {
     weightKg: (r.weight_kg as number | null) ?? undefined,
     personalMaxSpeedKmh: (r.personal_max_speed_kmh as number | null) ?? undefined,
     pbConfirmed: Boolean(r.pb_confirmed),
+    sprint10mSec: (r.sprint_10m_sec as number | null) ?? undefined,
+    sprint30mSec: (r.sprint_30m_sec as number | null) ?? undefined,
     active: Boolean(r.active),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,

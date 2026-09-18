@@ -46,6 +46,20 @@ export const onRequestPatch: PagesFunction<Env, string, AppData> = async ({ requ
     sets.push('personal_max_speed_kmh = ?')
     values.push(updated.personalMaxSpeedKmh ?? null)
   }
+  if (patch.sprint10mSec !== undefined || patch.sprint30mSec !== undefined) {
+    await ensureColumns(env, 'players', [
+      { name: 'sprint_10m_sec', type: 'REAL' },
+      { name: 'sprint_30m_sec', type: 'REAL' },
+    ])
+  }
+  if (patch.sprint10mSec !== undefined) {
+    sets.push('sprint_10m_sec = ?')
+    values.push(updated.sprint10mSec ?? null)
+  }
+  if (patch.sprint30mSec !== undefined) {
+    sets.push('sprint_30m_sec = ?')
+    values.push(updated.sprint30mSec ?? null)
+  }
   if (patch.pbConfirmed !== undefined) {
     sets.push('pb_confirmed = ?')
     values.push(updated.pbConfirmed ? 1 : 0)

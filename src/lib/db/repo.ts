@@ -58,6 +58,8 @@ export async function putPlayer(player: Player): Promise<void> {
       weightKg: player.weightKg,
       personalMaxSpeedKmh: player.personalMaxSpeedKmh,
       pbConfirmed: player.pbConfirmed,
+      sprint10mSec: player.sprint10mSec,
+      sprint30mSec: player.sprint30mSec,
     }),
   })
 }

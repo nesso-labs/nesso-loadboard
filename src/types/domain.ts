@@ -130,6 +130,9 @@ export interface Player {
   personalMaxSpeedKmh?: number
   /** Has a human confirmed personalMaxSpeedKmh is a trustworthy reference? See lib/metrics/pb.ts. */
   pbConfirmed: boolean
+  /** Manually entered sprint test times (seconds) — not derived from GPS imports. */
+  sprint10mSec?: number
+  sprint30mSec?: number
   active: boolean
   createdAt: string
   updatedAt: string
