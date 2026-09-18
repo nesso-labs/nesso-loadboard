@@ -6,7 +6,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, sprintCount } from '../lib/metrics/metricsCatalog'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
-import { matchDayLabels, type DrillSegment, type SessionType } from '../types/domain'
+import { matchDayLabels, type DrillSegment, type Player, type SessionType } from '../types/domain'
 
 type TypeFilter = SessionType | 'all'
 
@@ -22,6 +22,15 @@ interface MetricSpec {
   unit: string
   getValue: (s: DrillSegment) => number
   aggregate: 'sum' | 'max'
+}
+
+/** Sourced from the Roster, not from GPS sessions — same value regardless of the period/type filter, always the latest figure entered in Roster & Positions. */
+interface RosterMetricSpec {
+  key: string
+  label: string
+  unit: string
+  getValue: (p: Player) => number | undefined
+  sortOrder: 'asc' | 'desc'
 }
 
 interface ScatterVarSpec {
@@ -64,6 +73,7 @@ export function LeaderboardPage() {
 
   const playerById = new Map(players.map((p) => [p.id, p]))
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
+  const activePlayers = players.filter((p) => p.active)
 
   const metrics: MetricSpec[] = [
     { key: 'td', label: 'Distanza totale', unit: 'm', getValue: (s) => s.totalDistanceM, aggregate: 'sum' },
@@ -73,7 +83,17 @@ export function LeaderboardPage() {
     { key: 'mechw', label: 'Mechanical Work', unit: '#', getValue: (s) => mechanicalWork(s, settings), aggregate: 'sum' },
     { key: 'vmax', label: 'Velocità massima', unit: 'km/h', getValue: (s) => s.maxSpeedKmh, aggregate: 'max' },
   ]
-  const metric = metrics.find((m) => m.key === metricKey)!
+  // Figures from Roster & Positions — same for every player regardless of the period/type filter
+  // below (always the latest value entered), unlike every GPS-derived metric above. Sprint times
+  // rank ascending (fastest first); height/weight rank descending, like the GPS metrics.
+  const rosterMetrics: RosterMetricSpec[] = [
+    { key: 'sprint10m', label: 'Sprint 10m', unit: 's', getValue: (p) => p.sprint10mSec, sortOrder: 'asc' },
+    { key: 'sprint30m', label: 'Sprint 30m', unit: 's', getValue: (p) => p.sprint30mSec, sortOrder: 'asc' },
+    { key: 'height', label: 'Altezza', unit: 'cm', getValue: (p) => p.heightCm, sortOrder: 'desc' },
+    { key: 'weight', label: 'Peso', unit: 'kg', getValue: (p) => p.weightKg, sortOrder: 'desc' },
+  ]
+  const rosterMetric = rosterMetrics.find((m) => m.key === metricKey)
+  const segmentMetric = metrics.find((m) => m.key === metricKey)
 
   const effectiveStart = startDate || currentSession.date
   const effectiveEnd = endDate || currentSession.date
@@ -89,7 +109,7 @@ export function LeaderboardPage() {
     (s) => s.segmentKind === 'full_session' && scopeSessionIds.has(s.sessionId) && activePlayerIds.has(s.playerId),
   )
 
-  if (scopedSegs.length === 0) {
+  if (!rosterMetric && scopedSegs.length === 0) {
     return (
       <EmptyState
         icon={Trophy}
@@ -99,25 +119,56 @@ export function LeaderboardPage() {
     )
   }
 
-  const byPlayer = new Map<string, number[]>()
-  for (const seg of scopedSegs) {
-    const list = byPlayer.get(seg.playerId) ?? []
-    list.push(metric.getValue(seg))
-    byPlayer.set(seg.playerId, list)
+  let rows: { playerId: string; name: string; value: number }[]
+  let unit: string
+  let higherIsBetter: boolean
+
+  if (rosterMetric) {
+    const sortSign = rosterMetric.sortOrder === 'asc' ? 1 : -1
+    rows = activePlayers
+      .map((p) => ({ playerId: p.id, name: p.displayName, value: rosterMetric.getValue(p) }))
+      .filter((r): r is { playerId: string; name: string; value: number } => r.value !== undefined)
+      .sort((a, b) => sortSign * (a.value - b.value))
+    unit = rosterMetric.unit
+    higherIsBetter = rosterMetric.sortOrder === 'desc'
+  } else {
+    const metric = segmentMetric!
+    const byPlayer = new Map<string, number[]>()
+    for (const seg of scopedSegs) {
+      const list = byPlayer.get(seg.playerId) ?? []
+      list.push(metric.getValue(seg))
+      byPlayer.set(seg.playerId, list)
+    }
+    rows = [...byPlayer.entries()]
+      .map(([playerId, values]) => ({
+        playerId,
+        name: playerById.get(playerId)?.displayName ?? playerId,
+        value: metric.aggregate === 'sum' ? values.reduce((a, b) => a + b, 0) : Math.max(...values),
+      }))
+      .sort((a, b) => b.value - a.value)
+    unit = metric.unit
+    higherIsBetter = true
   }
 
-  const rows = [...byPlayer.entries()]
-    .map(([playerId, values]) => ({
-      playerId,
-      name: playerById.get(playerId)?.displayName ?? playerId,
-      position: playerById.get(playerId)?.position,
-      value: metric.aggregate === 'sum' ? values.reduce((a, b) => a + b, 0) : Math.max(...values),
-    }))
-    .sort((a, b) => b.value - a.value)
+  if (rosterMetric && rows.length === 0) {
+    return (
+      <EmptyState
+        icon={Trophy}
+        title="Nessun dato registrato"
+        description={`Inserisci i dati di "${rosterMetric.label}" in Roster & Positions per vedere questa classifica.`}
+      />
+    )
+  }
 
-  const maxValue = Math.max(...rows.map((r) => r.value), 1)
-
-  const activePlayers = players.filter((p) => p.active)
+  const values = rows.map((r) => r.value)
+  const maxValue = Math.max(...values, 1)
+  const minValue = Math.min(...values, 0)
+  const decimals = unit === 'km/h' || unit === 'kg' ? 1 : unit === 's' ? 2 : 0
+  const barWidthPct = (value: number) => {
+    if (higherIsBetter) return Math.min(100, (value / maxValue) * 100)
+    const range = maxValue - minValue
+    return range > 0 ? Math.min(100, ((maxValue - value) / range) * 100) : 100
+  }
 
   // GPS-derived variables reuse the same period/mode-scoped segments as the leaderboard bars above;
   // anagraphic ones (height/weight) are constant per player, so the selected period doesn't apply to them.
@@ -149,10 +200,11 @@ export function LeaderboardPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-md border border-border bg-surface p-3 text-sm text-ink-secondary">
-        Classifica dei giocatori attivi in base alla metrica scelta, calcolata sul periodo e sul tipo di sessione
-        selezionati. Usa i filtri qui sotto per cambiare metrica, intervallo di date e Allenamenti/Partite/Entrambi.
-        Lo scatterplot in fondo mette a confronto due variabili a scelta (anche altezza e peso) per individuare
-        relazioni tra i giocatori.
+        Classifica dei giocatori attivi in base alla metrica scelta. Le metriche GPS sono calcolate sul periodo e
+        sul tipo di sessione selezionati. Le metriche contrassegnate con <strong>*</strong> (Sprint 10m, Sprint
+        30m, Altezza, Peso) vengono invece da Roster &amp; Positions: sono <strong>indipendenti dal periodo
+        selezionato</strong> e mostrano sempre il dato più recente inserito. Lo scatterplot in fondo mette a
+        confronto due variabili a scelta (anche altezza e peso) per individuare relazioni tra i giocatori.
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
@@ -162,11 +214,20 @@ export function LeaderboardPage() {
             onChange={(e) => setMetricKey(e.target.value)}
             className="rounded-md border border-border bg-surface px-3 py-1.5 text-ink"
           >
-            {metrics.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.label}
-              </option>
-            ))}
+            <optgroup label="GPS">
+              {metrics.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Roster">
+              {rosterMetrics.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label} *
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <DateRangePicker
@@ -201,11 +262,12 @@ export function LeaderboardPage() {
               <div className="h-4 flex-1 rounded bg-ink/5">
                 <div
                   className={`h-4 rounded ${i < 3 ? 'bg-accent' : 'bg-ink-muted'}`}
-                  style={{ width: `${(row.value / maxValue) * 100}%` }}
+                  style={{ width: `${barWidthPct(row.value)}%` }}
                 />
               </div>
               <span className="w-16 shrink-0 text-right tabular-nums text-ink">
-                {row.value.toFixed(metric.unit === 'km/h' ? 1 : 0)}
+                {row.value.toFixed(decimals)}
+                {rosterMetric ? ` ${unit}` : ''}
               </span>
             </div>
           ))}
