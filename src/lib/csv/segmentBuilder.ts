@@ -4,7 +4,9 @@ import { slugify } from '../utils'
 
 export function classifySegmentKind(drillTitle: string): SegmentKind {
   const lower = drillTitle.toLowerCase()
-  if (lower.includes('full session')) return 'full_session'
+  // "Full Training" is some exports' name for the same thing as "Full Session" — treated identically,
+  // so it never falls through to the "no Full Session row found" synthesis-and-warning path below.
+  if (lower.includes('full session') || lower.includes('full training')) return 'full_session'
   if (lower.includes('warm')) return 'warmup'
   return 'drill'
 }
