@@ -8,7 +8,7 @@ export interface PbEvaluation {
 }
 
 /** Above this, a recorded top speed is almost certainly a GPS/sensor artifact, not a real sprint. */
-export const PB_PLAUSIBILITY_CEILING_KMH = 36.5
+export const PB_PLAUSIBILITY_CEILING_KMH = 38
 
 /**
  * Our own recorded-max-speed reference is auto-updated whenever a session
