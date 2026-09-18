@@ -45,7 +45,11 @@ export function WeeklyRunningPage() {
   const activeWeek = selectedWeek ?? weeks[0]
   const sessionIdsInWeek = new Set(sessions.filter((s) => isoWeek(s.date) === activeWeek).map((s) => s.id))
   const weekSegments = segments.filter(
-    (s) => s.segmentKind === 'full_session' && sessionIdsInWeek.has(s.sessionId) && activePlayerIds.has(s.playerId),
+    (s) =>
+      s.segmentKind === 'full_session' &&
+      !s.isRehab &&
+      sessionIdsInWeek.has(s.sessionId) &&
+      activePlayerIds.has(s.playerId),
   )
 
   if (weekSegments.length === 0) {

@@ -36,7 +36,9 @@ export function AlertsPage() {
 
   if (!currentSession || loadingSegments || !settings) return null
 
-  const fullSessionSegs = segments.filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId))
+  const fullSessionSegs = segments.filter(
+    (s) => s.segmentKind === 'full_session' && !s.isRehab && activePlayerIds.has(s.playerId),
+  )
 
   if (fullSessionSegs.length === 0) {
     return (
@@ -50,7 +52,9 @@ export function AlertsPage() {
 
   const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
   const recentFullSessions: DatedFullSession[] = allSegments
-    .filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .filter(
+      (s) => s.segmentKind === 'full_session' && !s.isRehab && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId),
+    )
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
 
   const flags = computeSessionAlerts(fullSessionSegs, rpe, settings, recentFullSessions, currentSession.date)

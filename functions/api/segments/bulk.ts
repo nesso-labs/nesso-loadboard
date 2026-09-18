@@ -10,8 +10,8 @@ const UPSERT_SQL = `
     distance_per_min, distance_zone4_m, distance_zone5_m, distance_zone6_m, entries_zone5,
     entries_zone6, hsr_m, hsr_per_min, max_speed_kmh, pct_max_speed, acc_zone3, dec_zone3,
     acc_zone4, dec_zone4, acc_zone5, dec_zone5, acc_zone6, dec_zone6, acc_per_min, dec_per_min,
-    dropped_duplicates, warnings, is_synthesized_full_session
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    dropped_duplicates, warnings, is_synthesized_full_session, is_rehab
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET
     drill_title = excluded.drill_title, segment_kind = excluded.segment_kind,
     duration_sec = excluded.duration_sec, total_distance_m = excluded.total_distance_m,
@@ -24,7 +24,7 @@ const UPSERT_SQL = `
     dec_zone5 = excluded.dec_zone5, acc_zone6 = excluded.acc_zone6, dec_zone6 = excluded.dec_zone6,
     acc_per_min = excluded.acc_per_min, dec_per_min = excluded.dec_per_min,
     dropped_duplicates = excluded.dropped_duplicates, warnings = excluded.warnings,
-    is_synthesized_full_session = excluded.is_synthesized_full_session
+    is_synthesized_full_session = excluded.is_synthesized_full_session, is_rehab = excluded.is_rehab
   WHERE segments.workspace_id = excluded.workspace_id
 `
 
@@ -32,7 +32,10 @@ export const onRequestPost: PagesFunction<Env, string, AppData> = async ({ reque
   const segments = (await request.json()) as DrillSegment[]
   if (!Array.isArray(segments) || segments.length === 0) return badRequest('expected a non-empty array of segments')
 
-  await ensureColumns(env, 'segments', [{ name: 'workspace_id', type: 'TEXT' }])
+  await ensureColumns(env, 'segments', [
+    { name: 'workspace_id', type: 'TEXT' },
+    { name: 'is_rehab', type: 'INTEGER NOT NULL DEFAULT 0' },
+  ])
 
   const workspaceId = data.auth.workspaceId
   const stmt = env.DB.prepare(UPSERT_SQL)

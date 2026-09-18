@@ -85,8 +85,9 @@ export function GameVGamePage() {
   }
   const allMetrics = [...METRICS, mechWorkSpec]
 
+  // Rehab (injured) players are excluded from every match average on this page.
   const fullSegsForSession = (sessionId: string | undefined) =>
-    segments.filter((s) => s.sessionId === sessionId && s.segmentKind === 'full_session')
+    segments.filter((s) => s.sessionId === sessionId && s.segmentKind === 'full_session' && !s.isRehab)
   const segsA = fullSegsForSession(matchA?.id)
   const segsB = fullSegsForSession(matchB?.id)
 
@@ -108,7 +109,7 @@ export function GameVGamePage() {
   const groupRows = [...sessionsByGroup.entries()]
     .map(([key, sessionsInGroup]) => {
       const sessionIds = new Set(sessionsInGroup.map((s) => s.id))
-      const groupSegs = segments.filter((s) => s.segmentKind === 'full_session' && sessionIds.has(s.sessionId))
+      const groupSegs = segments.filter((s) => s.segmentKind === 'full_session' && !s.isRehab && sessionIds.has(s.sessionId))
       return {
         key,
         label: groupLabelFor(key),

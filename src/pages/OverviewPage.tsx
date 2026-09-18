@@ -77,11 +77,18 @@ export function OverviewPage() {
   const maxSpeed = Math.max(0, ...activeSegments.map((s) => s.maxSpeedKmh))
   const activeRpe = rpe.filter((r) => activePlayerIds.has(r.playerId))
   const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
+  // Alerts stay rehab-excluded even here (Overview only embeds the same Alerts logic) — a
+  // player doing injury rehab work shouldn't drag the median down or get flagged itself.
+  const alertsFullSessionRows = fullSessionRows.filter((s) => !s.isRehab)
   const recentFullSessions: DatedFullSession[] = allSegments
-    .filter((s) => s.segmentKind === 'full_session' && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .filter(
+      (s) => s.segmentKind === 'full_session' && !s.isRehab && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId),
+    )
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
   const flags =
-    settings && currentSession ? computeSessionAlerts(fullSessionRows, activeRpe, settings, recentFullSessions, currentSession.date) : []
+    settings && currentSession
+      ? computeSessionAlerts(alertsFullSessionRows, activeRpe, settings, recentFullSessions, currentSession.date)
+      : []
   const microMetricDef =
     SELECTABLE_MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? SELECTABLE_MICROCYCLE_METRICS[0]
   const microcycleByPlayer = settings

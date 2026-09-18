@@ -100,6 +100,7 @@ export function segmentToRow(s: DrillSegment): unknown[] {
     s.droppedDuplicates ? JSON.stringify(s.droppedDuplicates) : null,
     s.warnings ? JSON.stringify(s.warnings) : null,
     s.isSynthesizedFullSession ? 1 : 0,
+    s.isRehab ? 1 : 0,
   ]
 }
 
@@ -135,6 +136,7 @@ export function rowToSegment(r: Record<string, unknown>): DrillSegment {
     droppedDuplicates: r.dropped_duplicates ? JSON.parse(r.dropped_duplicates as string) : undefined,
     warnings: r.warnings ? JSON.parse(r.warnings as string) : undefined,
     isSynthesizedFullSession: Boolean(r.is_synthesized_full_session),
+    isRehab: Boolean(r.is_rehab),
   }
 }
 

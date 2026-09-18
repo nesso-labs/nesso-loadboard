@@ -50,8 +50,12 @@ export function DynamicLoadPage() {
 
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date))
   const fullSessionByDate = sorted.map((session) => {
-    const segs = segments.filter((s) => s.sessionId === session.id && s.segmentKind === 'full_session')
-    const sessionRpe = rpe.filter((r) => r.sessionId === session.id)
+    const allSegs = segments.filter((s) => s.sessionId === session.id && s.segmentKind === 'full_session')
+    // Rehab (injured) players are excluded from every team-wide average on this page — their
+    // reduced load isn't representative of the squad's, for either the GPS metrics or sRPE.
+    const rehabPlayerIds = new Set(allSegs.filter((s) => s.isRehab).map((s) => s.playerId))
+    const segs = allSegs.filter((s) => !s.isRehab)
+    const sessionRpe = rpe.filter((r) => r.sessionId === session.id && !rehabPlayerIds.has(r.playerId))
     return { session, segs, sessionRpe }
   })
 

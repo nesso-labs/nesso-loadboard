@@ -170,6 +170,12 @@ export interface DrillSegment {
    *  segment was synthesized instead — for a match, strictly the sum of the
    *  1st/2nd Half rows; for a training, the sum of all other segments. */
   isSynthesizedFullSession?: boolean
+  /** True if the drill title was "Rehab" (or similar) — the player was doing
+   *  injury rehab work, not normal training. Still counts as this player's own
+   *  full_session (their own history/trend/RPE stay intact), but must never
+   *  feed a team-wide average/median/ranking — see isRehabTitle() in
+   *  lib/csv/segmentBuilder.ts for the detection rule. */
+  isRehab?: boolean
 }
 
 /** Manual RPE entry for one player in one session (Borg CR10 by default). */

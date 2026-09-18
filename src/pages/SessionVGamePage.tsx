@@ -62,7 +62,9 @@ export function SessionVGamePage() {
   const activeTrainingId = selectedTrainingId ?? defaultTrainingId
   const activeTraining = trainingSessions.find((s) => s.id === activeTrainingId)
 
-  const gameSegs = segments.filter((s) => s.segmentKind === 'full_session' && matchSessionIds.has(s.sessionId))
+  // Rehab (injured) players are excluded from every average on this page — a reduced rehab
+  // session isn't representative of either the training or the match-model side of the comparison.
+  const gameSegs = segments.filter((s) => s.segmentKind === 'full_session' && !s.isRehab && matchSessionIds.has(s.sessionId))
 
   if (trainingSessions.length === 0) {
     return (
@@ -87,7 +89,7 @@ export function SessionVGamePage() {
   if (!activeTraining) return null
 
   const trainingSessionSegsAll = segments.filter((s) => s.sessionId === activeTraining.id)
-  const trainingFullSegsAll = trainingSessionSegsAll.filter((s) => s.segmentKind === 'full_session')
+  const trainingFullSegsAll = trainingSessionSegsAll.filter((s) => s.segmentKind === 'full_session' && !s.isRehab)
   const matchCount = matchSessionIds.size
 
   const toggleKind = (kind: ChartKind) => {
@@ -120,7 +122,7 @@ export function SessionVGamePage() {
   // Post-match cumulative load: every training since the last match, summed per player.
   const microcycleSessionIds = new Set(currentMicrocycleSessions(sessions).map((s) => s.id))
   const postMatchFullSegs = segments.filter(
-    (s) => s.segmentKind === 'full_session' && microcycleSessionIds.has(s.sessionId),
+    (s) => s.segmentKind === 'full_session' && !s.isRehab && microcycleSessionIds.has(s.sessionId),
   )
 
   const buildEntity = (id: string, label: string, playerId: string | undefined): EntityData => {

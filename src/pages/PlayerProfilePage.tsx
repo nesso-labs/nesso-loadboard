@@ -138,11 +138,17 @@ export function PlayerProfilePage() {
   const activePlayerIdSet = new Set(activeRosterPlayers.map((p) => p.id))
   const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
   const recentFullSessions: DatedFullSession[] = allSegments
-    .filter((s) => s.segmentKind === 'full_session' && activePlayerIdSet.has(s.playerId) && sessionDateById.has(s.sessionId))
+    .filter(
+      (s) => s.segmentKind === 'full_session' && !s.isRehab && activePlayerIdSet.has(s.playerId) && sessionDateById.has(s.sessionId),
+    )
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
   const currentSessionFullSegs = currentSession
     ? allSegments.filter(
-        (s) => s.sessionId === currentSession.id && s.segmentKind === 'full_session' && activePlayerIdSet.has(s.playerId),
+        (s) =>
+          s.sessionId === currentSession.id &&
+          s.segmentKind === 'full_session' &&
+          !s.isRehab &&
+          activePlayerIdSet.has(s.playerId),
       )
     : []
   const playerAlerts =
@@ -367,8 +373,13 @@ export function PlayerProfilePage() {
                 <tbody>
                   {[...fullSessionSegs].reverse().map((r) => {
                     const included = !excludedSegIds.has(r.segment.id)
+                    const rehab = r.segment.isRehab
+                    const cellText = rehab ? 'text-status-critical' : 'text-ink'
                     return (
-                    <tr key={r.segment.id} className={`border-b border-border last:border-0 ${included ? '' : 'opacity-40'}`}>
+                    <tr
+                      key={r.segment.id}
+                      className={`border-b border-border last:border-0 ${rehab ? 'bg-status-critical/10' : ''} ${included ? '' : 'opacity-40'}`}
+                    >
                       <td className="px-4 py-2">
                         <input
                           type="checkbox"
@@ -378,13 +389,20 @@ export function PlayerProfilePage() {
                           className="size-4 rounded border-border accent-[var(--color-accent)]"
                         />
                       </td>
-                      <td className="px-4 py-2 tabular-nums text-ink">{r.session.date}</td>
-                      <td className="px-4 py-2 text-ink-secondary">{sessionHistoryLabel(r.session)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      <td className={`px-4 py-2 tabular-nums ${cellText}`}>{r.session.date}</td>
+                      <td className={`px-4 py-2 ${rehab ? 'text-status-critical' : 'text-ink-secondary'}`}>
+                        {sessionHistoryLabel(r.session)}
+                        {rehab && (
+                          <span className="ml-1.5 rounded-full bg-status-critical/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-status-critical">
+                            Rehab
+                          </span>
+                        )}
+                      </td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>
                         {r.segment.totalDistanceM.toFixed(0)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-ink">{r.segment.hsrM.toFixed(0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-ink">
+                      <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>{r.segment.hsrM.toFixed(0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${cellText}`}>
                         {r.segment.maxSpeedKmh.toFixed(1)}
                       </td>
                     </tr>
@@ -393,6 +411,13 @@ export function PlayerProfilePage() {
                 </tbody>
               </table>
             </div>
+            {fullSessionSegs.some((r) => r.segment.isRehab) && (
+              <p className="mt-2 text-xs text-status-critical">
+                Le righe in rosso sono sessioni di rehab (giocatore infortunato): contano per lo storico personale
+                di {player?.displayName ?? 'questo giocatore'}, ma sono escluse da medie, mediane e classifiche di
+                squadra altrove nell'app.
+              </p>
+            )}
           </div>
         </>
       )}

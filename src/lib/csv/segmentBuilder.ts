@@ -4,11 +4,18 @@ import { slugify } from '../utils'
 
 export function classifySegmentKind(drillTitle: string): SegmentKind {
   const lower = drillTitle.toLowerCase()
-  // "Full Training" is some exports' name for the same thing as "Full Session" — treated identically,
-  // so it never falls through to the "no Full Session row found" synthesis-and-warning path below.
-  if (lower.includes('full session') || lower.includes('full training')) return 'full_session'
+  // "Full Training" and "Rehab" are some exports' names for a player's whole-session row —
+  // treated identically to "Full Session" so they never fall through to the "no Full Session
+  // row found" synthesis-and-warning path below. Rehab rows are additionally flagged via
+  // isRehabTitle() so team-wide averages can exclude them.
+  if (lower.includes('full session') || lower.includes('full training') || lower.includes('rehab')) return 'full_session'
   if (lower.includes('warm')) return 'warmup'
   return 'drill'
+}
+
+/** A player doing injury rehab work instead of normal training — still counts as their own full_session, but must never feed a team-wide average/median/ranking. */
+export function isRehabTitle(drillTitle: string): boolean {
+  return drillTitle.toLowerCase().includes('rehab')
 }
 
 /** Match-day exports never carry a "Full Session" row — the two half rows ARE the whole match. */
@@ -75,6 +82,7 @@ export async function buildSegmentsForSession(
       playerId,
       drillTitle,
       segmentKind,
+      isRehab: isRehabTitle(drillTitle),
       durationSec: chosen.durationSec,
       totalDistanceM: chosen.totalDistanceM,
       distancePerMin: chosen.distancePerMin,
