@@ -1,5 +1,5 @@
 import type { AppSettings, DrillSegment, RpeEntry } from '../../types/domain'
-import { mechanicalWorkPerMin } from './metricsCatalog'
+import { mechanicalWorkPerMin, pctOfPersonalBest } from './metricsCatalog'
 import { median } from './heatmap'
 
 export type AlertSeverity = 'warning' | 'serious' | 'critical'
@@ -27,12 +27,18 @@ function isoDateMinusDays(dateIso: string, days: number): string {
 }
 
 /**
- * Session-relative flags — no multi-week history required. Speed-deficit
- * uses the CSV's own %MaxSpeed field (already personal-relative, vs that
- * player's own recorded max — not a team comparison). The load flags are
- * relative to THIS session's own team median (same deviation bands as the
- * Drills heatmap), which is useful even on a single imported session but
- * will get more meaningful once real week-over-week history exists.
+ * Session-relative flags — no multi-week history required. Speed-deficit and
+ * low-speed-exposure are both "% of MY OWN historical max" — computed from
+ * this app's own confirmed personalMaxSpeedKmh reference (personalMaxByPlayer,
+ * confirmed players only), never from the CSV's own %MaxSpeed column: that
+ * field is the GPS vendor's internal reference for the player, which can
+ * silently drift from ours (unset, stale, or simply wrong on the vendor's
+ * side) and has produced nonsense deficits before — see
+ * impliedVendorPersonalBestKmh() in pb.ts for the cross-check that catches it.
+ * The load flags are relative to THIS session's own team median (same
+ * deviation bands as the Drills heatmap), which is useful even on a single
+ * imported session but will get more meaningful once real week-over-week
+ * history exists.
  *
  * `recentFullSessions` + `referenceDate` are optional: pass every full_session
  * row for these players (any session, any date) plus the date to treat as
@@ -42,6 +48,7 @@ export function computeSessionAlerts(
   fullSessionSegs: DrillSegment[],
   rpeEntries: RpeEntry[],
   settings: AppSettings,
+  personalMaxByPlayer: Map<string, number>,
   recentFullSessions: DatedFullSession[] = [],
   referenceDate?: string,
 ): AlertFlag[] {
@@ -49,12 +56,13 @@ export function computeSessionAlerts(
   const { maxSpeedDeficitPct, highMechWorkRelative, highVolumeRelative, highSRpeRelative } = settings.alertThresholds
 
   for (const seg of fullSessionSegs) {
-    if (seg.pctMaxSpeed > 0 && seg.pctMaxSpeed < maxSpeedDeficitPct) {
+    const pct = pctOfPersonalBest(seg, personalMaxByPlayer.get(seg.playerId))
+    if (pct !== null && pct > 0 && pct < maxSpeedDeficitPct) {
       flags.push({
         playerId: seg.playerId,
         type: 'speed-deficit',
-        severity: seg.pctMaxSpeed < maxSpeedDeficitPct - 15 ? 'serious' : 'warning',
-        message: `Velocità massima raggiunta: ${seg.pctMaxSpeed.toFixed(0)}% del proprio massimo storico (soglia ${maxSpeedDeficitPct}%).`,
+        severity: pct < maxSpeedDeficitPct - 15 ? 'serious' : 'warning',
+        message: `Velocità massima raggiunta: ${pct.toFixed(0)}% del proprio massimo storico (soglia ${maxSpeedDeficitPct}%).`,
       })
     }
   }
@@ -102,13 +110,15 @@ export function computeSessionAlerts(
 
   if (referenceDate) {
     const windowStart = isoDateMinusDays(referenceDate, SPEED_EXPOSURE_WINDOW_DAYS - 1)
-    // Only rows with a real (>0) %MaxSpeed reading count — a missing/uncoded
-    // value must never be read as "0% exposure" and turned into a fabricated flag.
+    // Only rows with a real (>0) %-of-own-max reading count — a missing/unconfirmed
+    // reference must never be read as "0% exposure" and turned into a fabricated flag.
     const peakPctByPlayer = new Map<string, number>()
     for (const { seg, date } of recentFullSessions) {
-      if (date < windowStart || date > referenceDate || seg.pctMaxSpeed <= 0) continue
+      if (date < windowStart || date > referenceDate) continue
+      const pct = pctOfPersonalBest(seg, personalMaxByPlayer.get(seg.playerId))
+      if (pct === null || pct <= 0) continue
       const peak = peakPctByPlayer.get(seg.playerId) ?? 0
-      if (seg.pctMaxSpeed > peak) peakPctByPlayer.set(seg.playerId, seg.pctMaxSpeed)
+      if (pct > peak) peakPctByPlayer.set(seg.playerId, pct)
     }
 
     for (const seg of fullSessionSegs) {

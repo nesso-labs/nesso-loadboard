@@ -342,11 +342,22 @@ export function PlayerProfilePage() {
           activePlayerIdSet.has(s.playerId),
       )
     : []
+  // Only CONFIRMED references — an unconfirmed or vendor-only value must never silently drive an alert.
+  const personalMaxByPlayer = new Map(
+    activeRosterPlayers
+      .filter((p) => p.pbConfirmed && p.personalMaxSpeedKmh !== undefined)
+      .map((p) => [p.id, p.personalMaxSpeedKmh as number]),
+  )
   const playerAlerts =
     activePlayerId && settings && currentSession && currentSessionFullSegs.length > 0
-      ? computeSessionAlerts(currentSessionFullSegs, currentSessionRpe, settings, recentFullSessions, currentSession.date).filter(
-          (f) => f.playerId === activePlayerId,
-        )
+      ? computeSessionAlerts(
+          currentSessionFullSegs,
+          currentSessionRpe,
+          settings,
+          personalMaxByPlayer,
+          recentFullSessions,
+          currentSession.date,
+        ).filter((f) => f.playerId === activePlayerId)
       : []
 
   return (

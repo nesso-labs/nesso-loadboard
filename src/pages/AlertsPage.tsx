@@ -57,7 +57,12 @@ export function AlertsPage() {
     )
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
 
-  const flags = computeSessionAlerts(fullSessionSegs, rpe, settings, recentFullSessions, currentSession.date)
+  // Only CONFIRMED references — an unconfirmed or vendor-only value must never silently drive an alert.
+  const personalMaxByPlayer = new Map(
+    players.filter((p) => p.pbConfirmed && p.personalMaxSpeedKmh !== undefined).map((p) => [p.id, p.personalMaxSpeedKmh as number]),
+  )
+
+  const flags = computeSessionAlerts(fullSessionSegs, rpe, settings, personalMaxByPlayer, recentFullSessions, currentSession.date)
 
   return (
     <div className="flex flex-col gap-4">

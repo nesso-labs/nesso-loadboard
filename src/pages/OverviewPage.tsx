@@ -85,9 +85,13 @@ export function OverviewPage() {
       (s) => s.segmentKind === 'full_session' && !s.isRehab && activePlayerIds.has(s.playerId) && sessionDateById.has(s.sessionId),
     )
     .map((seg) => ({ seg, date: sessionDateById.get(seg.sessionId)! }))
+  // Only CONFIRMED references — an unconfirmed or vendor-only value must never silently drive an alert.
+  const personalMaxByPlayer = new Map(
+    players.filter((p) => p.pbConfirmed && p.personalMaxSpeedKmh !== undefined).map((p) => [p.id, p.personalMaxSpeedKmh as number]),
+  )
   const flags =
     settings && currentSession
-      ? computeSessionAlerts(alertsFullSessionRows, activeRpe, settings, recentFullSessions, currentSession.date)
+      ? computeSessionAlerts(alertsFullSessionRows, activeRpe, settings, personalMaxByPlayer, recentFullSessions, currentSession.date)
       : []
   const microMetricDef =
     SELECTABLE_MICROCYCLE_METRICS.find((m) => m.key === microMetricKey) ?? SELECTABLE_MICROCYCLE_METRICS[0]
