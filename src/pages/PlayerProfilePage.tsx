@@ -1,4 +1,5 @@
-import { ShieldCheck, UserCircle } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { Link2, ShieldCheck, UserCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { TrendLine } from '../components/charts/TrendLine'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
@@ -15,8 +16,19 @@ import {
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { formatNumber, isoWeek, mean } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
+import { deletePlayerLink, proposePlayerLink, respondToPlayerLink } from '../lib/db/repo'
+import { useAuth } from '../state/AuthContext'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, usePlayersQuery, useRpeBySessionQuery, useSegmentsByPlayerQuery, useSettingsQuery } from '../state/queries'
+import {
+  useAllSegmentsQuery,
+  useInvalidatePlayerLinks,
+  useLinkedPlayerDataQuery,
+  usePlayerLinksQuery,
+  usePlayersQuery,
+  useRpeBySessionQuery,
+  useSegmentsByPlayerQuery,
+  useSettingsQuery,
+} from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment, type Session } from '../types/domain'
 
 const DENOMINATOR_CAPTION: Record<string, string> = {
@@ -51,12 +63,171 @@ function sessionHistoryLabel(session: Session): string {
   return `${session.date} — ${typeLabel}`
 }
 
+/** Pending link requests aimed at one of MY players, from another workspace — shown regardless of which player is currently selected, so they're never missed. */
+function PendingLinkRequestsBanner() {
+  const { data: links = [] } = usePlayerLinksQuery()
+  const invalidate = useInvalidatePlayerLinks()
+  const respond = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'accepted' | 'rejected' }) => respondToPlayerLink(id, status),
+    onSuccess: invalidate,
+  })
+
+  const incoming = links.filter((l) => l.status === 'pending' && !l.proposedByMe)
+  if (incoming.length === 0) return null
+
+  return (
+    <div className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm">
+      <p className="mb-2 font-medium text-ink">Richieste di collegamento in sospeso</p>
+      <ul className="flex flex-col gap-2">
+        {incoming.map((l) => (
+          <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-ink-secondary">
+              <strong className="text-ink">{l.otherEditorEmail}</strong> vuole collegare "{l.otherPlayerName}" al tuo
+              giocatore <strong className="text-ink">{l.myPlayerName}</strong>
+            </span>
+            <span className="flex gap-2">
+              <button
+                type="button"
+                disabled={respond.isPending}
+                onClick={() => respond.mutate({ id: l.id, status: 'accepted' })}
+                className="rounded-md bg-accent px-2 py-1 font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+              >
+                Accetta
+              </button>
+              <button
+                type="button"
+                disabled={respond.isPending}
+                onClick={() => respond.mutate({ id: l.id, status: 'rejected' })}
+                className="rounded-md border border-border px-2 py-1 text-ink-secondary hover:bg-ink/5 disabled:opacity-60"
+              >
+                Rifiuta
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Link status + management for the currently selected player, specifically. */
+function PlayerLinkPanel({ playerId, canEdit }: { playerId: string; canEdit: boolean }) {
+  const { data: links = [] } = usePlayerLinksQuery()
+  const invalidate = useInvalidatePlayerLinks()
+  const [formOpen, setFormOpen] = useState(false)
+  const [targetEmail, setTargetEmail] = useState('')
+  const [targetName, setTargetName] = useState('')
+
+  const propose = useMutation({
+    mutationFn: () => proposePlayerLink({ myPlayerId: playerId, targetEditorEmail: targetEmail, targetPlayerName: targetName }),
+    onSuccess: () => {
+      invalidate()
+      setFormOpen(false)
+      setTargetEmail('')
+      setTargetName('')
+    },
+  })
+  const remove = useMutation({ mutationFn: (id: string) => deletePlayerLink(id), onSuccess: invalidate })
+
+  const link = links.find((l) => l.myPlayerId === playerId)
+
+  if (link?.status === 'accepted') {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-secondary">
+        <Link2 className="size-3.5 text-status-good" />
+        Collegato con <strong className="text-ink">{link.otherPlayerName}</strong> ({link.otherEditorEmail})
+        {canEdit && (
+          <button type="button" onClick={() => remove.mutate(link.id)} className="ml-1 font-medium text-status-critical hover:underline">
+            Scollega
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (link?.status === 'pending' && link.proposedByMe) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-ink-secondary">
+        <Link2 className="size-3.5 text-status-warning" />
+        In attesa che {link.otherEditorEmail} confermi il collegamento con "{link.otherPlayerName}"
+        {canEdit && (
+          <button type="button" onClick={() => remove.mutate(link.id)} className="ml-1 font-medium text-ink-secondary hover:underline">
+            Annulla
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (!canEdit) return null
+
+  if (!formOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => setFormOpen(true)}
+        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink/5"
+      >
+        <Link2 className="size-3.5" /> Collega a un giocatore di un'altra squadra
+      </button>
+    )
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        propose.mutate()
+      }}
+      className="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface p-3 text-xs"
+    >
+      <label className="flex flex-col gap-1">
+        <span className="text-ink-secondary">Email dell'altro allenatore (Editor/Admin)</span>
+        <input
+          type="email"
+          required
+          value={targetEmail}
+          onChange={(e) => setTargetEmail(e.target.value)}
+          className="w-56 rounded-md border border-border bg-page px-2 py-1.5 text-ink"
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-ink-secondary">Nome esatto del giocatore nel suo roster</span>
+        <input
+          type="text"
+          required
+          value={targetName}
+          onChange={(e) => setTargetName(e.target.value)}
+          className="w-48 rounded-md border border-border bg-page px-2 py-1.5 text-ink"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={propose.isPending}
+        className="rounded-md bg-accent px-3 py-1.5 font-medium text-accent-ink hover:opacity-90 disabled:opacity-60"
+      >
+        {propose.isPending ? 'Invio…' : 'Proponi collegamento'}
+      </button>
+      <button type="button" onClick={() => setFormOpen(false)} className="rounded-md px-3 py-1.5 text-ink-secondary hover:bg-ink/5">
+        Annulla
+      </button>
+      {propose.isError && <p className="w-full text-status-critical">{(propose.error as Error).message}</p>}
+      <p className="w-full text-[11px] text-ink-muted">
+        L'altro allenatore vedrà le date delle vostre sessioni (per calcolare correttamente i suoi modelli) e dovrà
+        confermare prima che i dati vengano condivisi.
+      </p>
+    </form>
+  )
+}
+
 export function PlayerProfilePage() {
   const { data: players = [], isLoading: loadingPlayers } = usePlayersQuery()
   const { sessions, currentSession } = useCurrentSession()
   const { data: settings } = useSettingsQuery()
   const { data: allSegments = [] } = useAllSegmentsQuery()
   const { data: currentSessionRpe = [] } = useRpeBySessionQuery(currentSession?.id)
+  const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
+  const { canEdit } = useAuth()
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [trendMetricKey, setTrendMetricKey] = useState('td')
   // Session ids excluded from the trend line above — everything is included by default,
@@ -67,7 +238,20 @@ export function PlayerProfilePage() {
   const activePlayerId = selectedId && activeRosterPlayers.some((p) => p.id === selectedId) ? selectedId : activeRosterPlayers[0]?.id
   const { data: segments = [], isLoading: loadingSegments } = useSegmentsByPlayerQuery(activePlayerId)
 
-  const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions])
+  // If this player has an accepted cross-workspace link, fold in the other team's sessions/segments —
+  // history, trend, microcycle and weekly-model all become "complete" for a dual-registered player.
+  // Team-wide pools (alerts below) deliberately keep using the un-merged `sessions`/`allSegments`.
+  const linkedEntry = linkedPlayerData.find((l) => l.myPlayerId === activePlayerId)
+  const mergedSessions = useMemo(
+    () => (linkedEntry ? [...sessions, ...linkedEntry.sessions] : sessions),
+    [sessions, linkedEntry],
+  )
+  const mergedSegments = useMemo(
+    () => (linkedEntry ? [...segments, ...linkedEntry.segments] : segments),
+    [segments, linkedEntry],
+  )
+
+  const sessionById = useMemo(() => new Map(mergedSessions.map((s) => [s.id, s])), [mergedSessions])
   const player = activeRosterPlayers.find((p) => p.id === activePlayerId)
 
   if (loadingPlayers) return null
@@ -82,10 +266,10 @@ export function PlayerProfilePage() {
     )
   }
 
-  const fullSessionSegs = segments
+  const fullSessionSegs = mergedSegments
     .filter((s) => s.segmentKind === 'full_session')
     .map((s) => ({ segment: s, session: sessionById.get(s.sessionId) }))
-    .filter((row): row is { segment: (typeof segments)[number]; session: NonNullable<(typeof row)['session']> } => !!row.session)
+    .filter((row): row is { segment: (typeof mergedSegments)[number]; session: NonNullable<(typeof row)['session']> } => !!row.session)
     .sort((a, b) => a.session.date.localeCompare(b.session.date))
 
   const trendMetrics: TrendMetricSpec[] = [
@@ -113,7 +297,7 @@ export function PlayerProfilePage() {
 
   const chartRows = fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
 
-  const sessionCount = new Set(segments.map((s) => s.sessionId)).size
+  const sessionCount = new Set(mergedSegments.map((s) => s.sessionId)).size
   // Weekly, not per-session: sum this player's distance within each calendar week, then
   // average those weekly totals — a session-count average would understate weeks with more
   // sessions and overstate quiet ones.
@@ -123,21 +307,21 @@ export function PlayerProfilePage() {
     weeklyDistanceTotals.set(week, (weeklyDistanceTotals.get(week) ?? 0) + r.segment.totalDistanceM)
   }
   const avgWeeklyDistance = mean([...weeklyDistanceTotals.values()])
-  const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
-  const maxSpeedSegment = segments.find((s) => s.maxSpeedKmh === maxSpeed)
+  const maxSpeed = Math.max(0, ...mergedSegments.map((s) => s.maxSpeedKmh))
+  const maxSpeedSegment = mergedSegments.find((s) => s.maxSpeedKmh === maxSpeed)
   const maxSpeedDate = maxSpeedSegment ? sessionById.get(maxSpeedSegment.sessionId)?.date : undefined
   const microcycleRows =
     activePlayerId && settings
       ? MICROCYCLE_METRICS.map((def) => ({
           def,
-          result: computeMicrocycleCompletion(activePlayerId, sessions, segments, (s) => def.metric(s, settings)),
+          result: computeMicrocycleCompletion(activePlayerId, mergedSessions, mergedSegments, (s) => def.metric(s, settings)),
         }))
       : []
 
-  const matchSessionIds = new Set(sessions.filter((s) => s.type === 'match').map((s) => s.id))
-  const gameSegs = segments.filter((s) => s.segmentKind === 'full_session' && matchSessionIds.has(s.sessionId))
+  const matchSessionIds = new Set(mergedSessions.filter((s) => s.type === 'match').map((s) => s.id))
+  const gameSegs = mergedSegments.filter((s) => s.segmentKind === 'full_session' && matchSessionIds.has(s.sessionId))
   const weeklyModelRows =
-    activePlayerId && gameSegs.length > 0 ? computeWeeklyPerformanceModel(segments, gameSegs, sessions) : []
+    activePlayerId && gameSegs.length > 0 ? computeWeeklyPerformanceModel(mergedSegments, gameSegs, mergedSessions) : []
 
   // Alerts are inherently a per-session concept (team median, 7-day speed-exposure window ending on a
   // specific date) — this page shows this player's slice of the currently selected session's alerts,
@@ -167,6 +351,8 @@ export function PlayerProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PendingLinkRequestsBanner />
+
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-ink-secondary">Giocatore</span>
@@ -209,6 +395,8 @@ export function PlayerProfilePage() {
         )}
       </div>
 
+      {activePlayerId && <PlayerLinkPanel playerId={activePlayerId} canEdit={canEdit} />}
+
       {loadingSegments ? null : sessionCount === 0 ? (
         <EmptyState
           icon={UserCircle}
@@ -217,6 +405,13 @@ export function PlayerProfilePage() {
         />
       ) : (
         <>
+          {linkedEntry && (
+            <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <Link2 className="size-3.5 text-status-good" />
+              Include le sessioni collegate di "{linkedEntry.otherPlayerName}" nell'altro spazio.
+            </p>
+          )}
+
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Sessioni" value={String(sessionCount)} />
             <StatTile label="Distanza media settimanale" value={formatNumber(avgWeeklyDistance)} unit="m" />

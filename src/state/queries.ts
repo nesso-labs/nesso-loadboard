@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   listAllRpe,
   listAllSegments,
+  listLinkedPlayerData,
+  listPlayerLinks,
   listPlayers,
   listRpeBySession,
   listSegmentsByPlayer,
@@ -19,6 +21,8 @@ export const queryKeys = {
   rpeBySession: (sessionId: string) => ['rpe', 'by-session', sessionId] as const,
   allRpe: ['rpe', 'all'] as const,
   settings: ['settings'] as const,
+  playerLinks: ['player-links'] as const,
+  linkedPlayerData: ['player-links', 'linked-data'] as const,
 }
 
 export function useSessionsQuery() {
@@ -65,6 +69,15 @@ export function useSettingsQuery() {
   return useQuery({ queryKey: queryKeys.settings, queryFn: getSettings })
 }
 
+export function usePlayerLinksQuery() {
+  return useQuery({ queryKey: queryKeys.playerLinks, queryFn: listPlayerLinks })
+}
+
+/** Merged history (sessions + this player's segments) from every accepted cross-workspace link — see functions/api/player-links/linked-data.ts. */
+export function useLinkedPlayerDataQuery() {
+  return useQuery({ queryKey: queryKeys.linkedPlayerData, queryFn: listLinkedPlayerData })
+}
+
 /** Invalidates everything a session import or delete can affect — segments and RPE included, since both write those tables. Broad on purpose; use a narrower invalidator below for a metadata-only or RPE-only edit, which don't touch segments at all. */
 export function useInvalidateAfterImport() {
   const queryClient = useQueryClient()
@@ -88,5 +101,14 @@ export function useInvalidateRpe() {
   return (sessionId: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.rpeBySession(sessionId) })
     queryClient.invalidateQueries({ queryKey: queryKeys.allRpe })
+  }
+}
+
+/** After proposing/accepting/rejecting/deleting a player link — both the request list and the merged data it feeds. */
+export function useInvalidatePlayerLinks() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.playerLinks })
+    queryClient.invalidateQueries({ queryKey: queryKeys.linkedPlayerData })
   }
 }

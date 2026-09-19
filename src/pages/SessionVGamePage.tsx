@@ -1,4 +1,4 @@
-import { Swords } from 'lucide-react'
+import { Link2, Swords } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -6,14 +6,16 @@ import { distanceAbove19_8, distanceAbove25_2, mechanicalWork } from '../lib/met
 import { currentMicrocycleSessions } from '../lib/metrics/microcycle'
 import { performanceModelAverage } from '../lib/metrics/performanceModel'
 import {
+  computeWeeklyPerformanceModel,
   PERFORMANCE_MODEL_ALPHA,
   PERFORMANCE_MODEL_METRICS as METRICS,
   WEEKLY_TARGET_MULTIPLIER as TARGET_MULTIPLIER,
   type PerformanceModelMetricSpec as MetricSpec,
+  type WeeklyModelRow,
 } from '../lib/metrics/weeklyPerformanceModel'
 import { mean } from '../lib/utils'
 import { useCurrentSession } from '../state/CurrentSessionContext'
-import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllSegmentsQuery, useLinkedPlayerDataQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import { TRAINING_TYPE_LABEL, type DrillSegment } from '../types/domain'
 
 const TEAM_ID = '__team__'
@@ -34,6 +36,11 @@ interface EntityData {
   gameSegs: DrillSegment[]
   gamePerformanceModel: Record<string, number>
   postMatchValue: (volume: (s: DrillSegment) => number) => number
+  /** Set only for a player linked to another workspace — replaces postMatchValue/gamePerformanceModel
+   *  above for the weekly-model bars specifically, computed on the merged (both-team) history via the
+   *  same pure function Player Profile uses, since this workspace's own last-match boundary isn't
+   *  necessarily his. */
+  linkedWeeklyModel?: WeeklyModelRow[]
 }
 
 export function SessionVGamePage() {
@@ -42,6 +49,7 @@ export function SessionVGamePage() {
   const { data: rawSegments = [], isLoading } = useAllSegmentsQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
+  const { data: linkedPlayerData = [] } = useLinkedPlayerDataQuery()
   const [selectedTrainingId, setSelectedTrainingId] = useState<string | undefined>(undefined)
   const [selectedKinds, setSelectedKinds] = useState<ChartKind[]>([...CHART_KIND_ORDER])
 
@@ -49,6 +57,7 @@ export function SessionVGamePage() {
   const activePlayerIds = useMemo(() => new Set(players.filter((p) => p.active).map((p) => p.id)), [players])
   // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
   const segments = useMemo(() => rawSegments.filter((s) => activePlayerIds.has(s.playerId)), [rawSegments, activePlayerIds])
+  const linkedByPlayerId = useMemo(() => new Map(linkedPlayerData.map((l) => [l.myPlayerId, l])), [linkedPlayerData])
 
   const trainingSessions = useMemo(
     () => sessions.filter((s) => s.type === 'training').sort((a, b) => b.date.localeCompare(a.date)),
@@ -151,7 +160,22 @@ export function SessionVGamePage() {
       return sums.length > 0 ? mean(sums) : 0
     }
 
-    return { id, label, trainingFullSegs, gameSegs: entityGameSegs, gamePerformanceModel, postMatchValue }
+    // A player linked to another workspace: recompute the weekly-model bars on the union of both
+    // teams' sessions/segments, via the same pure function Player Profile uses — this workspace's
+    // own last-match boundary (microcycleSessionIds above) only sees this team's matches.
+    const linked = playerId ? linkedByPlayerId.get(playerId) : undefined
+    let linkedWeeklyModel: WeeklyModelRow[] | undefined
+    if (playerId && linked) {
+      const mergedSessionsForPlayer = [...sessions, ...linked.sessions]
+      const mergedSegmentsForPlayer = [...segments.filter((s) => s.playerId === playerId), ...linked.segments]
+      const mergedMatchSessionIds = new Set(mergedSessionsForPlayer.filter((s) => s.type === 'match').map((s) => s.id))
+      const mergedGameSegs = mergedSegmentsForPlayer.filter(
+        (s) => s.segmentKind === 'full_session' && !s.isRehab && mergedMatchSessionIds.has(s.sessionId),
+      )
+      linkedWeeklyModel = computeWeeklyPerformanceModel(mergedSegmentsForPlayer, mergedGameSegs, mergedSessionsForPlayer)
+    }
+
+    return { id, label, trainingFullSegs, gameSegs: entityGameSegs, gamePerformanceModel, postMatchValue, linkedWeeklyModel }
   }
 
   const entities: EntityData[] = [
@@ -301,20 +325,32 @@ export function SessionVGamePage() {
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 {entities.map((entity) => (
                   <div key={entity.id} className={entity.id === TEAM_ID ? 'panel-accent p-4' : 'panel p-4'}>
-                    <p className="mb-3 text-sm font-medium text-ink">{entity.label}</p>
+                    <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-ink">
+                      {entity.label}
+                      {entity.linkedWeeklyModel && (
+                        <span title="Include le sessioni collegate dell'altro spazio">
+                          <Link2 className="size-3.5 text-status-good" />
+                        </span>
+                      )}
+                    </p>
                     <div className="flex flex-col gap-3">
-                      {METRICS.map((m) => (
+                      {METRICS.map((m) => {
+                        const linkedRow = entity.linkedWeeklyModel?.find((r) => r.key === m.key)
+                        return (
                         <ComparisonBar
                           key={m.key}
                           label={m.label}
                           unit={m.unit}
                           primaryLabel="Post-gara"
-                          primaryValue={entity.postMatchValue(m.volume)}
+                          primaryValue={linkedRow ? linkedRow.postMatchValue : entity.postMatchValue(m.volume)}
                           referenceLabel="Target"
-                          referenceValue={entity.gamePerformanceModel[m.key] * TARGET_MULTIPLIER[m.key]}
+                          referenceValue={
+                            linkedRow ? linkedRow.target : entity.gamePerformanceModel[m.key] * TARGET_MULTIPLIER[m.key]
+                          }
                           showRatio
                         />
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 ))}

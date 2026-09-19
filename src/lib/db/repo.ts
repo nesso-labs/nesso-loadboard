@@ -179,3 +179,52 @@ export async function adminListLoginAudit(userId?: string): Promise<LoginAuditEn
   const qs = userId ? `?userId=${encodeURIComponent(userId)}` : ''
   return apiFetch<LoginAuditEntry[]>(`/api/admin/login-audit${qs}`)
 }
+
+// ---------- player links (cross-workspace, same player) ----------
+
+export type PlayerLinkStatus = 'pending' | 'accepted' | 'rejected'
+
+export interface PlayerLink {
+  id: string
+  status: PlayerLinkStatus
+  /** True if this workspace proposed it — only the other side can accept/reject; either side can delete. */
+  proposedByMe: boolean
+  myPlayerId: string
+  myPlayerName: string
+  otherEditorEmail: string
+  otherPlayerName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listPlayerLinks(): Promise<PlayerLink[]> {
+  return apiFetch<PlayerLink[]>('/api/player-links')
+}
+
+export async function proposePlayerLink(input: {
+  myPlayerId: string
+  targetEditorEmail: string
+  targetPlayerName: string
+}): Promise<PlayerLink> {
+  return apiFetch<PlayerLink>('/api/player-links', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function respondToPlayerLink(id: string, status: 'accepted' | 'rejected'): Promise<void> {
+  await apiFetch(`/api/player-links/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+}
+
+export async function deletePlayerLink(id: string): Promise<void> {
+  await apiFetch(`/api/player-links/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export interface LinkedPlayerData {
+  myPlayerId: string
+  otherPlayerName: string
+  sessions: Session[]
+  segments: DrillSegment[]
+}
+
+/** For every accepted link, the other side's sessions (stripped down) and this player's segments from there, re-tagged to this workspace's player id. */
+export async function listLinkedPlayerData(): Promise<LinkedPlayerData[]> {
+  return apiFetch<LinkedPlayerData[]>('/api/player-links/linked-data')
+}
