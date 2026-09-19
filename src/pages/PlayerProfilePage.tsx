@@ -13,7 +13,7 @@ import {
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
-import { formatNumber } from '../lib/utils'
+import { formatNumber, isoWeek, mean } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { useCurrentSession } from '../state/CurrentSessionContext'
 import { useAllSegmentsQuery, usePlayersQuery, useRpeBySessionQuery, useSegmentsByPlayerQuery, useSettingsQuery } from '../state/queries'
@@ -114,8 +114,15 @@ export function PlayerProfilePage() {
   const chartRows = fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
 
   const sessionCount = new Set(segments.map((s) => s.sessionId)).size
-  const avgDistance =
-    fullSessionSegs.length > 0 ? fullSessionSegs.reduce((sum, r) => sum + r.segment.totalDistanceM, 0) / fullSessionSegs.length : 0
+  // Weekly, not per-session: sum this player's distance within each calendar week, then
+  // average those weekly totals — a session-count average would understate weeks with more
+  // sessions and overstate quiet ones.
+  const weeklyDistanceTotals = new Map<string, number>()
+  for (const r of fullSessionSegs) {
+    const week = isoWeek(r.session.date)
+    weeklyDistanceTotals.set(week, (weeklyDistanceTotals.get(week) ?? 0) + r.segment.totalDistanceM)
+  }
+  const avgWeeklyDistance = mean([...weeklyDistanceTotals.values()])
   const maxSpeed = Math.max(0, ...segments.map((s) => s.maxSpeedKmh))
   const maxSpeedSegment = segments.find((s) => s.maxSpeedKmh === maxSpeed)
   const maxSpeedDate = maxSpeedSegment ? sessionById.get(maxSpeedSegment.sessionId)?.date : undefined
@@ -192,12 +199,12 @@ export function PlayerProfilePage() {
         )}
         {player?.sprint10mSec !== undefined && (
           <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
-            Sprint 10m: {player.sprint10mSec.toFixed(2)}s
+            Sprint 10m: {player.sprint10mSec.toFixed(3)}s
           </span>
         )}
         {player?.sprint30mSec !== undefined && (
           <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-ink-secondary">
-            Sprint 30m: {player.sprint30mSec.toFixed(2)}s
+            Sprint 30m: {player.sprint30mSec.toFixed(3)}s
           </span>
         )}
       </div>
@@ -212,7 +219,7 @@ export function PlayerProfilePage() {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatTile label="Sessioni" value={String(sessionCount)} />
-            <StatTile label="Distanza media" value={formatNumber(avgDistance)} unit="m" />
+            <StatTile label="Distanza media settimanale" value={formatNumber(avgWeeklyDistance)} unit="m" />
             <StatTile
               label="Vmax storica"
               value={formatNumber(maxSpeed, 1)}

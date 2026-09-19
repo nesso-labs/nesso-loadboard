@@ -18,8 +18,8 @@ const POSITION_LABEL: Record<Position, string> = {
   UNSPECIFIED: 'Non assegnato',
 }
 
-/** Only NN.NN — up to 2 integer digits and up to 2 decimal digits, typed freely (no spinner). */
-const SPRINT_TIME_PATTERN = /^\d{0,2}(\.\d{0,2})?$/
+/** Only NN.NNN — up to 2 integer digits and up to 3 decimal digits, typed freely (no spinner). */
+const SPRINT_TIME_PATTERN = /^\d{0,2}(\.\d{0,3})?$/
 
 function SprintTimeCell({
   value,
@@ -30,11 +30,11 @@ function SprintTimeCell({
   canEdit: boolean
   onConfirm: (value: number | undefined) => void
 }) {
-  const [draft, setDraft] = useState(value !== undefined ? value.toFixed(2) : '')
+  const [draft, setDraft] = useState(value !== undefined ? value.toFixed(3) : '')
 
   // Stay in sync if the row's value changes from elsewhere (e.g. another tab/device).
   useEffect(() => {
-    setDraft(value !== undefined ? value.toFixed(2) : '')
+    setDraft(value !== undefined ? value.toFixed(3) : '')
   }, [value])
 
   const confirm = () => {
@@ -51,7 +51,7 @@ function SprintTimeCell({
       <input
         type="text"
         inputMode="decimal"
-        placeholder="0.00"
+        placeholder="0.000"
         disabled={!canEdit}
         value={draft}
         onChange={(e) => {
@@ -60,7 +60,7 @@ function SprintTimeCell({
         onKeyDown={(e) => {
           if (e.key === 'Enter') confirm()
         }}
-        className="w-16 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
+        className="w-20 rounded-md border border-border bg-page px-2 py-1 text-right tabular-nums text-sm text-ink disabled:opacity-60"
       />
       {canEdit && (
         <button

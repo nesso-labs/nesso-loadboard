@@ -163,7 +163,7 @@ export function LeaderboardPage() {
   const values = rows.map((r) => r.value)
   const maxValue = Math.max(...values, 1)
   const minValue = Math.min(...values, 0)
-  const decimals = unit === 'km/h' || unit === 'kg' ? 1 : unit === 's' ? 2 : 0
+  const decimals = unit === 'km/h' || unit === 'kg' ? 1 : unit === 's' ? 3 : 0
   const barWidthPct = (value: number) => {
     if (higherIsBetter) return Math.min(100, (value / maxValue) * 100)
     const range = maxValue - minValue
