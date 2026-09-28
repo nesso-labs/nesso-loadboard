@@ -14,6 +14,7 @@ import {
   sprintCount,
 } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
+import { median } from '../lib/metrics/heatmap'
 import { formatNumber, isoWeek, mean } from '../lib/utils'
 import { computeWeeklyPerformanceModel } from '../lib/metrics/weeklyPerformanceModel'
 import { deletePlayerLink, proposePlayerLink, respondToPlayerLink } from '../lib/db/repo'
@@ -233,8 +234,12 @@ export function PlayerProfilePage() {
   // Session ids excluded from the trend line above — everything is included by default,
   // so this only ever grows from the "deselect a row" checkboxes in the table below.
   const [excludedSegIds, setExcludedSegIds] = useState<Set<string>>(new Set())
+  // 'manual' = respect the checkboxes in the table below (existing behaviour).
+  // 'last7' = auto-show the last 7 calendar days, ignoring the checkboxes.
+  const [periodMode, setPeriodMode] = useState<'manual' | 'last7'>('manual')
 
   const activeRosterPlayers = useMemo(() => players.filter((p) => p.active), [players])
+  const activePlayerIdSet = useMemo(() => new Set(activeRosterPlayers.map((p) => p.id)), [activeRosterPlayers])
   const activePlayerId = selectedId && activeRosterPlayers.some((p) => p.id === selectedId) ? selectedId : activeRosterPlayers[0]?.id
   const { data: segments = [], isLoading: loadingSegments } = useSegmentsByPlayerQuery(activePlayerId)
 
@@ -295,7 +300,30 @@ export function PlayerProfilePage() {
     })
   }
 
-  const chartRows = fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
+  const last7StartDate = (() => {
+    if (fullSessionSegs.length === 0) return undefined
+    const mostRecent = fullSessionSegs[fullSessionSegs.length - 1].session.date
+    const d = new Date(mostRecent + 'T00:00:00Z')
+    d.setUTCDate(d.getUTCDate() - 6)
+    return d.toISOString().slice(0, 10)
+  })()
+  const chartRows =
+    periodMode === 'last7' && last7StartDate
+      ? fullSessionSegs.filter((r) => r.session.date >= last7StartDate)
+      : fullSessionSegs.filter((r) => !excludedSegIds.has(r.segment.id))
+
+  // Team median per charted session/metric, sourced from the un-merged, workspace-scoped
+  // allSegments (same rule as the alert pools above) — a cross-workspace linked session has
+  // no team here to compare against, so it's left out (null) rather than faked as 0.
+  const chartSessionIds = new Set(chartRows.map((r) => r.session.id))
+  const teamValuesBySession = new Map<string, number[]>()
+  for (const seg of allSegments) {
+    if (seg.segmentKind !== 'full_session' || seg.isRehab || !activePlayerIdSet.has(seg.playerId)) continue
+    if (!chartSessionIds.has(seg.sessionId)) continue
+    const list = teamValuesBySession.get(seg.sessionId) ?? []
+    list.push(trendMetric.getValue(seg))
+    teamValuesBySession.set(seg.sessionId, list)
+  }
 
   const sessionCount = new Set(mergedSegments.map((s) => s.sessionId)).size
   // Weekly, not per-session: sum this player's distance within each calendar week, then
@@ -326,7 +354,6 @@ export function PlayerProfilePage() {
   // Alerts are inherently a per-session concept (team median, 7-day speed-exposure window ending on a
   // specific date) — this page shows this player's slice of the currently selected session's alerts,
   // the same ones surfaced on Overview/Alerts, rather than replaying alerts for every past session.
-  const activePlayerIdSet = new Set(activeRosterPlayers.map((p) => p.id))
   const sessionDateById = new Map(sessions.map((s) => [s.id, s.date]))
   const recentFullSessions: DatedFullSession[] = allSegments
     .filter(
@@ -522,31 +549,59 @@ export function PlayerProfilePage() {
             <div className="panel p-4">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">{trendMetric.label} nel tempo</p>
-                <label className="flex items-center gap-2 text-xs">
-                  <span className="text-ink-secondary">Metrica</span>
-                  <select
-                    value={trendMetricKey}
-                    onChange={(e) => setTrendMetricKey(e.target.value)}
-                    className="rounded-md border border-border bg-surface px-2 py-1 text-ink"
-                  >
-                    {trendMetrics.map((m) => (
-                      <option key={m.key} value={m.key}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs">
+                    <span className="text-ink-secondary">Periodo</span>
+                    <select
+                      value={periodMode}
+                      onChange={(e) => setPeriodMode(e.target.value as 'manual' | 'last7')}
+                      className="rounded-md border border-border bg-surface px-2 py-1 text-ink"
+                    >
+                      <option value="manual">Selezione manuale</option>
+                      <option value="last7">Ultimi 7 giorni</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs">
+                    <span className="text-ink-secondary">Metrica</span>
+                    <select
+                      value={trendMetricKey}
+                      onChange={(e) => setTrendMetricKey(e.target.value)}
+                      className="rounded-md border border-border bg-surface px-2 py-1 text-ink"
+                    >
+                      {trendMetrics.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
               {chartRows.length >= 2 ? (
-                <TrendLine
-                  data={chartRows.map((r) => ({ x: r.session.date, value: trendMetric.getValue(r.segment) }))}
-                  valueFormatter={(v) =>
-                    `${formatNumber(v, trendMetric.unit === 'km/h' ? 1 : 0)}${trendMetric.unit ? ` ${trendMetric.unit}` : ''}`
-                  }
-                />
+                <>
+                  <TrendLine
+                    data={chartRows.map((r) => {
+                      const teamValues = teamValuesBySession.get(r.session.id)
+                      return {
+                        x: r.session.date,
+                        value: trendMetric.getValue(r.segment),
+                        median: teamValues && teamValues.length > 0 ? median(teamValues) : null,
+                      }
+                    })}
+                    valueFormatter={(v) =>
+                      `${formatNumber(v, trendMetric.unit === 'km/h' ? 1 : 0)}${trendMetric.unit ? ` ${trendMetric.unit}` : ''}`
+                    }
+                  />
+                  <p className="mt-1 text-center text-[11px] text-ink-muted">
+                    Linea continua: {player?.displayName ?? 'giocatore'}. Linea tratteggiata con ×: mediana squadra
+                    per la stessa sessione.
+                  </p>
+                </>
               ) : (
                 <p className="py-10 text-center text-xs text-ink-muted">
-                  Seleziona almeno 2 sessioni nella tabella qui sotto per vedere l'andamento.
+                  {periodMode === 'last7'
+                    ? "Nessuna sessione negli ultimi 7 giorni per vedere l'andamento."
+                    : "Seleziona almeno 2 sessioni nella tabella qui sotto per vedere l'andamento."}
                 </p>
               )}
             </div>
@@ -562,18 +617,24 @@ export function PlayerProfilePage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-ink">Storico sessioni</p>
               <div className="flex items-center gap-3 text-xs">
-                <span className="text-ink-muted">Seleziona le sessioni da includere nel grafico sopra</span>
+                <span className="text-ink-muted">
+                  {periodMode === 'last7'
+                    ? 'Periodo "Ultimi 7 giorni" attivo — la selezione qui sotto non ha effetto sul grafico'
+                    : 'Seleziona le sessioni da includere nel grafico sopra'}
+                </span>
                 <button
                   type="button"
+                  disabled={periodMode === 'last7'}
                   onClick={() => setExcludedSegIds(new Set())}
-                  className="font-medium text-accent hover:underline"
+                  className="font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
                 >
                   Seleziona tutto
                 </button>
                 <button
                   type="button"
+                  disabled={periodMode === 'last7'}
                   onClick={() => setExcludedSegIds(new Set(fullSessionSegs.map((r) => r.segment.id)))}
-                  className="font-medium text-accent hover:underline"
+                  className="font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
                 >
                   Deseleziona tutto
                 </button>
@@ -607,9 +668,10 @@ export function PlayerProfilePage() {
                         <input
                           type="checkbox"
                           checked={included}
+                          disabled={periodMode === 'last7'}
                           onChange={() => toggleSegSelection(r.segment.id)}
                           aria-label={`Includi la sessione del ${r.session.date} nel grafico`}
-                          className="size-4 rounded border-border accent-[var(--color-accent)]"
+                          className="size-4 rounded border-border accent-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </td>
                       <td className={`px-4 py-2 tabular-nums ${cellText}`}>{r.session.date}</td>
