@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { Link2, ShieldCheck, UserCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { TrendBars } from '../components/charts/TrendBars'
 import { TrendLine } from '../components/charts/TrendLine'
 import { ComparisonBar } from '../components/ui/ComparisonBar'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -324,6 +325,21 @@ export function PlayerProfilePage() {
     list.push(trendMetric.getValue(seg))
     teamValuesBySession.set(seg.sessionId, list)
   }
+  const chartData = chartRows.map((r) => {
+    const teamValues = teamValuesBySession.get(r.session.id)
+    return {
+      x: r.session.date,
+      value: trendMetric.getValue(r.segment),
+      median: teamValues && teamValues.length > 0 ? median(teamValues) : null,
+    }
+  })
+  const trendValueFormatter = (v: number) =>
+    `${formatNumber(v, trendMetric.unit === 'km/h' ? 1 : 0)}${trendMetric.unit ? ` ${trendMetric.unit}` : ''}`
+  // "Ultimi 7 giorni" swaps the line for per-session bars, with the player/median totals over
+  // that window written out as a simple ratio, e.g. (23410/22678) — no percentage, just the sums.
+  const periodPlayerTotal = chartData.reduce((sum, d) => sum + d.value, 0)
+  const periodMedianTotal = chartData.reduce((sum, d) => sum + (d.median ?? 0), 0)
+  const periodHasMedian = chartData.some((d) => d.median !== null)
 
   const sessionCount = new Set(mergedSegments.map((s) => s.sessionId)).size
   // Weekly, not per-session: sum this player's distance within each calendar week, then
@@ -579,23 +595,28 @@ export function PlayerProfilePage() {
               </div>
               {chartRows.length >= 2 ? (
                 <>
-                  <TrendLine
-                    data={chartRows.map((r) => {
-                      const teamValues = teamValuesBySession.get(r.session.id)
-                      return {
-                        x: r.session.date,
-                        value: trendMetric.getValue(r.segment),
-                        median: teamValues && teamValues.length > 0 ? median(teamValues) : null,
-                      }
-                    })}
-                    valueFormatter={(v) =>
-                      `${formatNumber(v, trendMetric.unit === 'km/h' ? 1 : 0)}${trendMetric.unit ? ` ${trendMetric.unit}` : ''}`
-                    }
-                  />
-                  <p className="mt-1 text-center text-[11px] text-ink-muted">
-                    Linea continua: {player?.displayName ?? 'giocatore'}. Linea tratteggiata con ×: mediana squadra
-                    per la stessa sessione.
-                  </p>
+                  {periodMode === 'last7' ? (
+                    <>
+                      <TrendBars data={chartData} valueFormatter={trendValueFormatter} />
+                      {periodHasMedian && (
+                        <p className="mt-1 text-center text-xs text-ink-secondary">
+                          Totale periodo — giocatore/mediana squadra:{' '}
+                          <span className="font-semibold tabular-nums text-ink">
+                            ({formatNumber(periodPlayerTotal, trendMetric.unit === 'km/h' ? 1 : 0)}/
+                            {formatNumber(periodMedianTotal, trendMetric.unit === 'km/h' ? 1 : 0)})
+                          </span>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <TrendLine data={chartData} valueFormatter={trendValueFormatter} />
+                      <p className="mt-1 text-center text-[11px] text-ink-muted">
+                        Linea continua: {player?.displayName ?? 'giocatore'}. Linea tratteggiata con ×: mediana
+                        squadra per la stessa sessione.
+                      </p>
+                    </>
+                  )}
                 </>
               ) : (
                 <p className="py-10 text-center text-xs text-ink-muted">
