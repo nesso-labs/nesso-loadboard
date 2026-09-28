@@ -16,7 +16,6 @@ import { SessionVGamePage } from './pages/SessionVGamePage'
 import { SessionVSessionPage } from './pages/SessionVSessionPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { useAuth } from './state/AuthContext'
-import { WeeklyRunningPage } from './pages/WeeklyRunningPage'
 
 export function App() {
   const { user, isLoading, isAdmin } = useAuth()
@@ -33,7 +32,6 @@ export function App() {
         <Route path="/session-v-game" element={<SessionVGamePage />} />
         <Route path="/session-v-session" element={<SessionVSessionPage />} />
         <Route path="/game-v-game" element={<GameVGamePage />} />
-        <Route path="/weekly-running" element={<WeeklyRunningPage />} />
         <Route path="/drills" element={<DrillsPage />} />
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/players" element={<PlayerProfilePage />} />

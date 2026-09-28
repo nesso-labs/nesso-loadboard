@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   BarChart3,
-  ClipboardList,
   Dumbbell,
   Flag,
   Gauge,
@@ -34,7 +33,6 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/session-v-game', label: 'Session v Game', icon: Swords },
   { path: '/session-v-session', label: 'Session v Session', icon: CalendarRange, needsHistory: true },
   { path: '/game-v-game', label: 'Game v Game', icon: Flag, needsHistory: true },
-  { path: '/weekly-running', label: 'Weekly Running', icon: ClipboardList, needsHistory: true },
   { path: '/drills', label: 'Drills', icon: Dumbbell },
   { path: '/compare', label: 'Compare', icon: Users2 },
   { path: '/players', label: 'Player Profile', icon: UserCircle },
