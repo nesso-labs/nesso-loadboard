@@ -7,7 +7,14 @@ export type SessionType = 'training' | 'match'
 export type Position = 'GK' | 'DEF' | 'MID' | 'FWD' | 'UNSPECIFIED'
 
 /** Sub-classification of a training session — lets the trainer compare like-for-like (e.g. Forza vs Forza), not just training-vs-training. Not applicable to matches. */
-export type TrainingType = 'ripresa' | 'forza' | 'metabolico_alte_velocita' | 'rifinitura' | 'recupero_attivo' | 'mix'
+export type TrainingType =
+  | 'ripresa'
+  | 'forza'
+  | 'metabolico_alte_velocita'
+  | 'rifinitura'
+  | 'recupero_attivo'
+  | 'mix'
+  | 'amichevole'
 
 export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
   ripresa: 'Ripresa',
@@ -16,6 +23,10 @@ export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
   rifinitura: 'Rifinitura',
   recupero_attivo: 'Recupero attivo',
   mix: 'Mix',
+  // A friendly match, imported like a real match (same full-session/game data) but filed as a
+  // training session — it must NOT close a microcycle the way a real match does (see
+  // lastMatchDate/historicalMicrocycleGroups in microcycle.ts, both keyed on type === 'match').
+  amichevole: 'Amichevole',
 }
 
 /** Outcome of a match session — not applicable to trainings. */

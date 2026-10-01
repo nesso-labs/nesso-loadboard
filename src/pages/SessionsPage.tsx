@@ -27,7 +27,15 @@ import {
   type TrainingType,
 } from '../types/domain'
 
-const TRAINING_TYPES: TrainingType[] = ['ripresa', 'forza', 'metabolico_alte_velocita', 'rifinitura', 'recupero_attivo', 'mix']
+const TRAINING_TYPES: TrainingType[] = [
+  'ripresa',
+  'forza',
+  'metabolico_alte_velocita',
+  'rifinitura',
+  'recupero_attivo',
+  'mix',
+  'amichevole',
+]
 const MATCH_RESULTS: MatchResult[] = ['win', 'draw', 'loss']
 const MATCH_LOCATIONS: MatchLocation[] = ['home', 'away', 'away_2d']
 
