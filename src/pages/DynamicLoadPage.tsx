@@ -2,11 +2,11 @@ import { BarChart3 } from 'lucide-react'
 import { MetricTrendPanel } from '../components/charts/MetricTrendPanel'
 import { MicrocycleBarChart, type MicrocycleBarChartGroup } from '../components/charts/MicrocycleBarChart'
 import { EmptyState } from '../components/ui/EmptyState'
-import { distanceAbove19_8, distanceAbove25_2, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
+import { distanceAbove19_8, distanceAbove25_2, mechanicalWork, MICROCYCLE_METRICS } from '../lib/metrics/metricsCatalog'
 import { computeMicrocycleCompletion } from '../lib/metrics/microcycle'
 import { rollingAverageByDateWindow } from '../lib/metrics/timeSeries'
 import { mean } from '../lib/utils'
-import { useAllRpeQuery, useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
+import { useAllSegmentsQuery, usePlayersQuery, useSessionsQuery, useSettingsQuery } from '../state/queries'
 import type { Player, Position } from '../types/domain'
 
 const POSITION_ORDER: Position[] = ['GK', 'DEF', 'MID', 'FWD', 'UNSPECIFIED']
@@ -27,7 +27,6 @@ interface MicrocycleRow {
 export function DynamicLoadPage() {
   const { data: sessions = [], isLoading: loadingSessions } = useSessionsQuery()
   const { data: rawSegments = [], isLoading: loadingSegments } = useAllSegmentsQuery()
-  const { data: rawRpe = [] } = useAllRpeQuery()
   const { data: players = [] } = usePlayersQuery()
   const { data: settings } = useSettingsQuery()
 
@@ -46,17 +45,14 @@ export function DynamicLoadPage() {
   // Deactivated players never show up again, anywhere on this page, until reactivated in Roster & Positions.
   const activePlayerIds = new Set(players.filter((p) => p.active).map((p) => p.id))
   const segments = rawSegments.filter((s) => activePlayerIds.has(s.playerId))
-  const rpe = rawRpe.filter((r) => activePlayerIds.has(r.playerId))
 
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date))
   const fullSessionByDate = sorted.map((session) => {
     const allSegs = segments.filter((s) => s.sessionId === session.id && s.segmentKind === 'full_session')
     // Rehab (injured) players are excluded from every team-wide average on this page — their
-    // reduced load isn't representative of the squad's, for either the GPS metrics or sRPE.
-    const rehabPlayerIds = new Set(allSegs.filter((s) => s.isRehab).map((s) => s.playerId))
+    // reduced load isn't representative of the squad's.
     const segs = allSegs.filter((s) => !s.isRehab)
-    const sessionRpe = rpe.filter((r) => r.sessionId === session.id && !rehabPlayerIds.has(r.playerId))
-    return { session, segs, sessionRpe }
+    return { session, segs }
   })
 
   const buildPoints = (getValue: (s: (typeof segments)[number]) => number) =>
@@ -67,18 +63,11 @@ export function DynamicLoadPage() {
       type: session.type,
     }))
 
-  const sRpePoints = fullSessionByDate.map(({ session, sessionRpe }) => ({
-    date: session.date,
-    label: session.date.slice(5),
-    value: sessionRpe.length > 0 ? mean(sessionRpe.map((r) => r.sRpe)) : 0,
-    type: session.type,
-  }))
-
   const panels = [
     { title: 'Distanza totale', unit: 'm', points: buildPoints((s) => s.totalDistanceM) },
     { title: 'Distanza > 19.8 km/h', unit: 'm', points: buildPoints(distanceAbove19_8) },
     { title: 'Distanza > 25.2 km/h', unit: 'm', points: buildPoints(distanceAbove25_2) },
-    { title: 'sRPE', unit: '', points: sRpePoints },
+    { title: 'Mechanical Work', unit: '#', points: buildPoints((s) => mechanicalWork(s, settings)) },
   ]
 
   const singleSession = sessions.length === 1
