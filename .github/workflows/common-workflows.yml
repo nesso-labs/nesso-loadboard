@@ -1,8 +1,12 @@
 name: Call common Workflows
 
+# DISABLED (2026-10-18): the org-wide README updater is switched off everywhere.
+# Here it never ran at all: this repo is public and cannot call the private
+# reusable workflow, so every push to main failed with "workflow file issue".
+# `if: false` alone would not stop that (the reference is resolved before any
+# `if:` is evaluated), so the push trigger is removed as well.
 on:
-  push:
-    branches: [ "main", "master" ]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -11,6 +15,7 @@ permissions:
 
 jobs:
   update-readme:
+    if: false
     uses: nesso-labs/nesso-ci-workflows/.github/workflows/reusable-update-readme.yml@main
 
   # No build-deploy jobs here: this repo is a static Vite app with no k8s
